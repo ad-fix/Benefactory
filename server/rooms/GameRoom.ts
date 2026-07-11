@@ -1,5 +1,5 @@
 import { Room, Client } from "colyseus";
-import { GameState, Player, Collectible, GridCell, PlayerColor, CollectibleType, CollectibleColor, CollectibleOrientation, Enemy, EnemyPersonality } from "../schema/GameState";
+import { GameState, Player, Collectible, GridCell, PlayerColor, CollectibleType, CollectibleColor, CollectibleOrientation } from "../schema/GameState";
 import { CollectibleFactory } from "../collectibles";
 import { CollectibleSpawnConfig, COLLECTIBLE_PROPERTIES } from "../config/CollectibleSpawnConfig";
 import { LevelSpec, parseUnrealExport } from "../config/LevelSpec";
@@ -59,7 +59,6 @@ export class GameRoom extends Room<GameState> {
   private readonly INITIAL_VISIBLE_WIDTH = 10; // Starting visible width (stage 1)
   private readonly INITIAL_VISIBLE_HEIGHT = 8; // Starting visible height (stage 1)
   private rng: SeededRNG;       // clue/collectible placement only
-  private enemyRng: SeededRNG;  // enemy spawning & movement only
   private collectibleSpawnConfig: CollectibleSpawnConfig;
   private userIds: Map<string, string> = new Map(); // sessionId -> userId
   private userIdToColor: Map<string, "RED" | "GREEN" | "BLUE"> = new Map(); // userId -> color for reconnection
@@ -77,8 +76,6 @@ export class GameRoom extends Room<GameState> {
   private isDevMode: boolean = false;
   private livekitService: LiveKitService;
   private livekitRoomName: string | null = null;
-  private enemyTimer: ReturnType<typeof setInterval> | null = null;
-  private readonly ENEMY_MOVE_DELAY = 2000; // 2 seconds
   private levelSpec: LevelSpec | null = null;
   private lobbyTimeout: ReturnType<typeof setTimeout> | null = null;
   private readonly LOBBY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in ms
@@ -194,7 +191,6 @@ export class GameRoom extends Room<GameState> {
       seed = this.collectibleSpawnConfig.seed ?? Math.floor(Math.random() * 2147483647);
     }
     this.rng = new SeededRNG(seed);
-    this.enemyRng = new SeededRNG(seed ^ 0x45_4E_45_4D); // separate stream for enemy logic
     console.log("RNG initialized with seed:", seed);
 
     this.stageThresholds = this.collectibleSpawnConfig.custom_target_scores || [];
@@ -818,10 +814,6 @@ export class GameRoom extends Room<GameState> {
       clearInterval(this.gameTimer);
       this.gameTimer = null;
     }
-    if (this.enemyTimer) {
-      clearInterval(this.enemyTimer);
-      this.enemyTimer = null;
-    }
     if (this.lobbyTimeout) {
       clearTimeout(this.lobbyTimeout);
       this.lobbyTimeout = null;
@@ -860,15 +852,6 @@ export class GameRoom extends Room<GameState> {
     // Generate initial collectibles
     this.generateInitialCollectibles();
     this.calculateScores();
-
-    // Spawn initial enemies from config (if any enemy rules exist)
-    // Skip enemy spawn rules when a level spec is loaded (enemies come from the level spec instead)
-    if (!this.levelSpec) {
-      this.spawnEnemiesForStage(1);
-      if (this.collectibleSpawnConfig.enemy_spawn_rules?.length) {
-        this.startEnemyTimer();
-      }
-    }
 
     // Initialize LiveKit voice chat (only in multiplayer mode)
     if (!this.isSoloMode) {
@@ -999,11 +982,6 @@ export class GameRoom extends Room<GameState> {
     if (this.gameTimer) {
       clearInterval(this.gameTimer);
       this.gameTimer = null;
-    }
-
-    if (this.enemyTimer) {
-      clearInterval(this.enemyTimer);
-      this.enemyTimer = null;
     }
 
     this.state.isGameOver = true;
@@ -1196,19 +1174,6 @@ export class GameRoom extends Room<GameState> {
       }
 
       this.state.collectibles.push(collectible);
-    }
-
-    // Spawn enemies
-    if (stageData.enemies) {
-      for (const enemyDef of stageData.enemies) {
-        const enemy = new Enemy();
-        enemy.id = `enemy-${Date.now()}-${this.state.enemies.length}`;
-        enemy.x = center + enemyDef.x - 1;
-        enemy.y = center + enemyDef.y - 1;
-        enemy.personality = enemyDef.personality || "same-color-avoiding";
-        this.state.enemies.push(enemy);
-        console.log(`Spawned enemy from level spec at (${enemy.x}, ${enemy.y})`);
-      }
     }
 
     console.log(`Spawned ${stageData.clues.length} clues for stage ${stage} from level spec`);
@@ -1565,12 +1530,6 @@ export class GameRoom extends Room<GameState> {
       }
     }
 
-    // Spawn enemies for each stage advanced
-    for (let s = 0; s < stagesAdvanced; s++) {
-      const currentStage = previousStage + s + 1;
-      this.spawnEnemiesForStage(currentStage);
-    }
-
     console.log(`Stage ${newStage}: Visible area expanded from ${oldGridWidth}x${oldGridHeight} to ${this.state.gridWidth}x${this.state.gridHeight}, added ${totalCollectiblesAdded} new collectibles`);
   }
 
@@ -1646,11 +1605,6 @@ export class GameRoom extends Room<GameState> {
       this.gameTimer = null;
     }
 
-    if (this.enemyTimer) {
-      clearInterval(this.enemyTimer);
-      this.enemyTimer = null;
-    }
-
     // Notify all players — clients will call room.leave() on receiving this
     this.broadcast("gameAbandoned", {});
 
@@ -1661,180 +1615,4 @@ export class GameRoom extends Room<GameState> {
     this.disconnect();
   }
 
-  private spawnEnemiesForStage(stage: number) {
-    const rules = this.collectibleSpawnConfig.enemy_spawn_rules;
-    if (!rules || rules.length === 0) return;
-
-    for (const rule of rules) {
-      if (stage < rule.first_stage) continue;
-      const count = stage === rule.first_stage ? rule.num_initial : rule.num_subsequent;
-      this.spawnEnemies(count, rule.personality);
-    }
-  }
-
-  private spawnEnemies(count: number, personality?: EnemyPersonality) {
-    const personalities: EnemyPersonality[] = [
-      "red-avoiding", "green-avoiding", "blue-avoiding", "same-color-avoiding", "prismatic"
-    ];
-
-    const center = Math.floor(this.MAX_GRID_SIZE / 2);
-    const halfWidth = Math.floor(this.state.gridWidth / 2);
-    const halfHeight = Math.floor(this.state.gridHeight / 2);
-    const minX = center - halfWidth;
-    const minY = center - halfHeight;
-
-    for (let i = 0; i < count; i++) {
-      const enemy = new Enemy();
-      enemy.id = `enemy-${Date.now()}-${i}-${this.state.enemies.length}`;
-      enemy.personality = personality || personalities[Math.floor(this.enemyRng.next() * personalities.length)];
-
-      // Spawn on a random cell within bounds
-      let attempts = 0;
-      do {
-        enemy.x = minX + Math.floor(this.enemyRng.next() * this.state.gridWidth);
-        enemy.y = minY + Math.floor(this.enemyRng.next() * this.state.gridHeight);
-        attempts++;
-      } while (this.isEnemySpawnBlocked(enemy.x, enemy.y) && attempts < 100);
-
-      this.state.enemies.push(enemy);
-      console.log(`Spawned enemy ${enemy.id} at (${enemy.x}, ${enemy.y}) with personality: ${enemy.personality}`);
-    }
-  }
-
-  private isEnemySpawnBlocked(x: number, y: number): boolean {
-    // Don't spawn on top of players
-    for (const [, player] of this.state.players) {
-      if (player.x === x && player.y === y) return true;
-    }
-    // Don't spawn on top of other enemies
-    for (const enemy of this.state.enemies) {
-      if (enemy.x === x && enemy.y === y) return true;
-    }
-    return false;
-  }
-
-  private startEnemyTimer() {
-    this.enemyTimer = setInterval(() => {
-      this.moveEnemies();
-    }, this.ENEMY_MOVE_DELAY);
-  }
-
-  private moveEnemies() {
-    if (this.state.countdown > 0) return;
-
-    const center = Math.floor(this.MAX_GRID_SIZE / 2);
-    const halfWidth = Math.floor(this.state.gridWidth / 2);
-    const halfHeight = Math.floor(this.state.gridHeight / 2);
-    const minX = center - halfWidth;
-    const maxX = center + halfWidth - 1;
-    const minY = center - halfHeight;
-    const maxY = center + halfHeight - 1;
-
-    // Phase 1: Compute all moves based on the current board state
-    const moves: Array<{ enemy: Enemy; oldX: number; oldY: number; newX: number; newY: number }> = [];
-
-    for (const enemy of this.state.enemies) {
-      // Get adjacent cells (up, down, left, right)
-      const adjacent = [
-        { x: enemy.x, y: enemy.y - 1 },
-        { x: enemy.x, y: enemy.y + 1 },
-        { x: enemy.x - 1, y: enemy.y },
-        { x: enemy.x + 1, y: enemy.y },
-      ].filter(pos =>
-        pos.x >= minX && pos.x <= maxX &&
-        pos.y >= minY && pos.y <= maxY
-      );
-
-      if (adjacent.length === 0) continue;
-
-      // Choose cell based on personality (reads current board state)
-      const chosen = this.chooseEnemyMove(enemy, adjacent);
-      if (chosen) {
-        moves.push({ enemy, oldX: enemy.x, oldY: enemy.y, newX: chosen.x, newY: chosen.y });
-      }
-    }
-
-    // Phase 2: Apply all moves at once
-    for (const move of moves) {
-      move.enemy.x = move.newX;
-      move.enemy.y = move.newY;
-
-      // Erase the cell the enemy just LEFT (set to blank)
-      const oldCellKey = `${move.oldX},${move.oldY}`;
-      this.state.gridColors.delete(oldCellKey);
-
-      // Log enemy move for replay
-      this.logEvent({ e: "enemy_move", id: move.enemy.id, x: move.newX, y: move.newY });
-    }
-
-    // Recalculate scores since cells were erased
-    this.calculateScores();
-  }
-
-  private chooseEnemyMove(
-    enemy: Enemy,
-    adjacent: Array<{ x: number; y: number }>
-  ): { x: number; y: number } | null {
-    const currentCellKey = `${enemy.x},${enemy.y}`;
-    const currentCell = this.state.gridColors.get(currentCellKey);
-    const currentColor = currentCell?.color; // undefined means blank
-
-    // Map PlayerColor to the color name the personality cares about
-    // "RED" player color displays as orange, "GREEN" as green, "BLUE" as blue
-    const avoidedPlayerColor: PlayerColor | null =
-      enemy.personality === "red-avoiding" ? "RED" :
-      enemy.personality === "green-avoiding" ? "GREEN" :
-      enemy.personality === "blue-avoiding" ? "BLUE" :
-      null; // same-color-avoiding handled separately
-
-    // Categorize adjacent cells
-    const preferred: Array<{ x: number; y: number }> = [];
-    const acceptable: Array<{ x: number; y: number }> = [];
-
-    for (const pos of adjacent) {
-      const cellKey = `${pos.x},${pos.y}`;
-      const cell = this.state.gridColors.get(cellKey);
-      const cellColor = cell?.color; // undefined = blank
-
-      if (enemy.personality === "prismatic") {
-        // Never step orange→green, green→blue, or blue→orange
-        // (RED→GREEN, GREEN→BLUE, BLUE→RED)
-        const forbidden =
-          (currentColor === "RED" && cellColor === "GREEN") ||
-          (currentColor === "GREEN" && cellColor === "BLUE") ||
-          (currentColor === "BLUE" && cellColor === "RED");
-
-        if (!forbidden) {
-          preferred.push(pos);
-        }
-        // forbidden transitions are simply not added to any pool
-      } else if (enemy.personality === "same-color-avoiding") {
-        // Never step from one color onto the same color, but can always step to/from blanks
-        if (!currentColor || !cellColor || currentColor !== cellColor) {
-          preferred.push(pos);
-        } else {
-          acceptable.push(pos);
-        }
-      } else {
-        // Color-avoiding personalities
-        const isAvoidedColor = cellColor === avoidedPlayerColor;
-        const isCurrentlyOnAvoided = currentColor === avoidedPlayerColor;
-
-        if (!isAvoidedColor) {
-          // Not the avoided color — always preferred
-          preferred.push(pos);
-        } else if (isCurrentlyOnAvoided) {
-          // On avoided color, stepping onto avoided color — acceptable but not preferred
-          acceptable.push(pos);
-        }
-        // else: not on avoided color, target is avoided color — never step there (skip)
-      }
-    }
-
-    // Pick from preferred first, then acceptable, then stay put
-    const pool = preferred.length > 0 ? preferred : acceptable;
-    if (pool.length === 0) return null;
-
-    return pool[Math.floor(this.enemyRng.next() * pool.length)];
-  }
 }

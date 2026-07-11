@@ -20,7 +20,6 @@ import { PulseRipple } from "@/components/game/PulseRipple";
 import { FloatingScore } from "@/components/FloatingScore";
 import { ClickHandler } from "@/components/ClickHandler";
 import { LambdaSymbol } from "@/components/LambdaSymbol";
-import { EnemyEntity } from "@/components/EnemyEntity";
 import { Info, Scale, Settings, Volume2, VolumeX, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSounds } from "@/hooks/use-sounds";
@@ -67,13 +66,6 @@ interface Collectible {
   orientation: CollectibleOrientation;
   isFlipped: boolean;
   score: number;
-}
-
-interface EnemyState {
-  x: number;
-  y: number;
-  id: string;
-  personality: string;
 }
 
 interface Ping {
@@ -373,7 +365,6 @@ interface GameScreenProps {
   players: Map<string, PlayerState>;
   gridColors: Map<string, PlayerColor>;
   collectibles: Collectible[];
-  enemies: EnemyState[];
   gridWidth: number;
   gridHeight: number;
   myColor: PlayerColor | null;
@@ -476,7 +467,6 @@ export const GameScreen = ({
   players,
   gridColors,
   collectibles,
-  enemies,
   gridWidth,
   gridHeight,
   myColor,
@@ -2262,14 +2252,6 @@ export const GameScreen = ({
                   rotation={0}
                   isMe={isMe}
                 />
-              );
-            })}
-
-            {/* Enemies */}
-            {enemies.map((enemy) => {
-              const pos = getVisualPos(enemy.x, enemy.y, -2.0);
-              return (
-                <EnemyEntity key={enemy.id} position={pos} personality={enemy.personality as "red-avoiding" | "green-avoiding" | "blue-avoiding" | "same-color-avoiding" | "prismatic"} />
               );
             })}
 

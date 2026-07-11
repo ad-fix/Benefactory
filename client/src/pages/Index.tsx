@@ -49,15 +49,6 @@ interface Collectible {
   score: number;
 }
 
-type EnemyPersonality = "red-avoiding" | "green-avoiding" | "blue-avoiding" | "same-color-avoiding";
-
-interface EnemyState {
-  x: number;
-  y: number;
-  id: string;
-  personality: EnemyPersonality;
-}
-
 interface ServerGameState {
   players: Map<string, PlayerState>;
   gridColors: Map<string, { color: PlayerColor }>;
@@ -71,7 +62,6 @@ interface ServerGameState {
   isGameOver: boolean;
   timeRemaining: number;
   collectibles: Map<string, Collectible>;
-  enemies: Map<string, EnemyState>;
   stage: number;
   stageThresholds: number[];
   seed: number;
@@ -84,7 +74,6 @@ interface GameStateLocal {
   players: Map<string, PlayerState>;
   gridColors: Map<string, PlayerColor>;
   collectibles: Collectible[];
-  enemies: EnemyState[];
   scores: Record<PlayerColor, number>;
   totalScore: number;
   highScore: number;
@@ -105,7 +94,6 @@ const initialGameState: GameStateLocal = {
   players: new Map(),
   gridColors: new Map(),
   collectibles: [],
-  enemies: [],
   scores: { RED: 0, GREEN: 0, BLUE: 0 },
   totalScore: 0,
   highScore: 0,
@@ -242,16 +230,6 @@ const Index = () => {
       });
     });
 
-    const newEnemies: EnemyState[] = [];
-    gameRoom.state.enemies?.forEach((enemy) => {
-      newEnemies.push({
-        x: enemy.x,
-        y: enemy.y,
-        id: enemy.id,
-        personality: enemy.personality as EnemyPersonality,
-      });
-    });
-
     dispatch({
       type: "SYNC_STATE",
       payload: {
@@ -265,7 +243,6 @@ const Index = () => {
         players: newPlayers,
         gridColors: newGridColors,
         collectibles: newCollectibles,
-        enemies: newEnemies,
         scores: {
           RED: gameRoom.state.scores?.get("RED") || 0,
           GREEN: gameRoom.state.scores?.get("GREEN") || 0,
@@ -552,7 +529,6 @@ const Index = () => {
         players={gameState.players}
         gridColors={gameState.gridColors}
         collectibles={gameState.collectibles}
-        enemies={gameState.enemies}
         gridWidth={gameState.gridWidth}
         gridHeight={gameState.gridHeight}
         myColor={myColor}

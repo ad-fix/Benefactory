@@ -32,15 +32,6 @@ export class Collectible extends Schema {
   @type("number") score: number = 0;
 }
 
-export type EnemyPersonality = "red-avoiding" | "green-avoiding" | "blue-avoiding" | "same-color-avoiding" | "prismatic";
-
-export class Enemy extends Schema {
-  @type("number") x: number = 0;
-  @type("number") y: number = 0;
-  @type("string") id: string = "";
-  @type("string") personality: EnemyPersonality = "red-avoiding";
-}
-
 export class GridCell extends Schema {
   @type("string") color: PlayerColor | undefined;
 }
@@ -54,8 +45,6 @@ export class GameState extends Schema {
   @type({ map: GridCell }) gridColors = new MapSchema<GridCell>();
 
   @type([Collectible]) collectibles = new ArraySchema<Collectible>();
-
-  @type([Enemy]) enemies = new ArraySchema<Enemy>();
 
   @type({ map: "number" }) scores = new MapSchema<number>();
 
