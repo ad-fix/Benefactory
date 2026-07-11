@@ -9,8 +9,6 @@ import { usePlatformVoice } from "@/hooks/usePlatformVoice";
 import { useSounds } from "@/hooks/use-sounds";
 import { PlatformVoiceOverlay } from "@/components/game/PlatformVoiceOverlay";
 import { ResultsOverlay } from "@/components/game/ResultsOverlay";
-import { MilestoneShowcase } from "@/components/game/MilestoneShowcase";
-import { symbolKeyFromName, milestoneAssets, type MilestoneSymbol } from "@/lib/svg3d/assets";
 
 /** Build a redirect URL back to the platform with query params */
 function buildReturnUrl(returnUrl: string, params: Record<string, string | number>): string {
@@ -25,11 +23,6 @@ function buildReturnUrl(returnUrl: string, params: Record<string, string | numbe
 type PlayerColor = "RED" | "GREEN" | "BLUE";
 type CollectibleType = "network" | "box" | "equilibrium" | "clone" | "vantage";
 
-interface UnlockedMilestone {
-  type: string;
-  name: string | null;
-  description: string | null;
-}
 type CollectibleOrientation = 0 | 90 | 180 | 270;
 type CollectibleColor = PlayerColor | "NEUTRAL";
 
@@ -176,14 +169,6 @@ const Index = () => {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const resultsReasonRef = useRef<"gameover" | "abandoned">("gameover");
-  // Accumulates new milestones as the server broadcasts them during the game.
-  // Keyed by player color → list of unlocks with card text from game_milestones.
-  const [unlockedDuringGame, setUnlockedDuringGame] = useState<Record<PlayerColor, UnlockedMilestone[]>>({
-    RED: [],
-    GREEN: [],
-    BLUE: [],
-  });
-  const [showMilestoneModal, setShowMilestoneModal] = useState(false);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
   const [bgMusicVolume, setBgMusicVolume] = useState(0.3);
   const { play: playSound } = useSounds();
@@ -210,15 +195,6 @@ const Index = () => {
     resultsReasonRef.current = "gameover";
     setShowResults(true);
   }, [gameState.isGameOver]);
-
-  // Open milestones modal 1s after results show, if the local player has any unlocks.
-  useEffect(() => {
-    if (!showResults || !myColor) return;
-    const myTypes = unlockedDuringGame[myColor] ?? [];
-    if (myTypes.length === 0) return;
-    const t = setTimeout(() => setShowMilestoneModal(true), 1000);
-    return () => clearTimeout(t);
-  }, [showResults, myColor, unlockedDuringGame]);
 
   // Show "GO" briefly when countdown transitions from >0 to 0,
   // and play the movement SFX on each tick from 10 down through GO (0).
@@ -346,22 +322,6 @@ const Index = () => {
           setVoiceColorMap(message.playerColors);
         }
       });
-
-      gameRoom.onMessage(
-        "milestoneUnlocked",
-        (data: { color: PlayerColor; type: string; name: string | null; description: string | null }) => {
-          setUnlockedDuringGame((prev) => {
-            const existing = prev[data.color] ?? [];
-            if (existing.some((m) => m.type === data.type)) return prev;
-            const next: UnlockedMilestone = {
-              type: data.type,
-              name: data.name,
-              description: data.description,
-            };
-            return { ...prev, [data.color]: [...existing, next] };
-          });
-        },
-      );
 
       return runSync;
     }
@@ -767,27 +727,6 @@ const Index = () => {
           }}
         />
       )}
-      {showMilestoneModal && myColor && (() => {
-        const myUnlocks = unlockedDuringGame[myColor] ?? [];
-        const items = myUnlocks
-          .map((m) => {
-            const svgKey = symbolKeyFromName(m.type);
-            if (!svgKey) return null;
-            return {
-              svgKey,
-              name: m.name ?? milestoneAssets[svgKey].name,
-              description: m.description ?? "",
-            };
-          })
-          .filter((i): i is { svgKey: MilestoneSymbol; name: string; description: string } => i !== null);
-        if (items.length === 0) return null;
-        return (
-          <MilestoneShowcase
-            items={items}
-            onDismiss={() => setShowMilestoneModal(false)}
-          />
-        );
-      })()}
     </div>
   );
 };

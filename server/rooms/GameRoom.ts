@@ -88,8 +88,6 @@ export class GameRoom extends Room<GameState> {
   private replayEvents: Array<Record<string, unknown>> = [];
   private gameStartTime: number = 0;
   private sessionEndedInDb: boolean = false;
-  private milestoneReportedTypes = new Set<string>();
-  private pendingMilestoneRequests: Promise<void>[] = [];
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
 
   onCreate(options: any) {
@@ -1008,14 +1006,6 @@ export class GameRoom extends Room<GameState> {
       this.enemyTimer = null;
     }
 
-    // Wait for any in-flight milestone fetches (max 3s). Each fetch broadcasts its
-    // own 'milestoneUnlocked' message the moment it resolves, so by the time this
-    // await completes all per-milestone broadcasts have already been sent.
-    await Promise.race([
-      Promise.allSettled(this.pendingMilestoneRequests),
-      new Promise(resolve => setTimeout(resolve, 3000)),
-    ]);
-
     this.state.isGameOver = true;
 
     console.log("Game ended! Final score:", this.state.highScore);
@@ -1332,43 +1322,6 @@ export class GameRoom extends Room<GameState> {
     // Check for stage advancement
     this.checkStageAdvancement();
 
-    // Report newly activated collectible types as milestones
-    this.reportNewMilestones();
-  }
-
-  private reportNewMilestones() {
-    if (this.isSoloMode) return;
-
-    const newTypes: string[] = [];
-    for (const collectible of this.state.collectibles) {
-      if (collectible.isActivated && collectible.score > 0 && !this.milestoneReportedTypes.has(collectible.type)) {
-        this.milestoneReportedTypes.add(collectible.type);
-        newTypes.push(collectible.type);
-      }
-    }
-
-    if (newTypes.length === 0) return;
-
-    const playerIds = Array.from(this.userIds.values());
-    if (playerIds.length === 0) return;
-
-    // (removed) Each newly activated type used to be POSTed to a platform
-    // milestone endpoint, which decided per-user whether the milestone was "new"
-    // and returned its display name/description. Standalone has no DB, so we
-    // broadcast locally instead: milestoneReportedTypes already dedupes
-    // each type to once per game. name/description are null — the client falls back
-    // to the built-in milestone asset name (see Index.tsx milestone showcase).
-    for (const type of newTypes) {
-      for (const [userId, color] of this.userIdToColor.entries()) {
-        if (!playerIds.includes(userId)) continue;
-        this.broadcast("milestoneUnlocked", {
-          color,
-          type,
-          name: null,
-          description: null,
-        });
-      }
-    }
   }
 
   private findConnectedComponents(
@@ -1697,14 +1650,6 @@ export class GameRoom extends Room<GameState> {
       clearInterval(this.enemyTimer);
       this.enemyTimer = null;
     }
-
-    // Wait for any in-flight milestone fetches (max 3s). Each fetch broadcasts its
-    // own 'milestoneUnlocked' message the moment it resolves, so by the time this
-    // await completes all per-milestone broadcasts have already been sent to clients.
-    await Promise.race([
-      Promise.allSettled(this.pendingMilestoneRequests),
-      new Promise(resolve => setTimeout(resolve, 3000)),
-    ]);
 
     // Notify all players — clients will call room.leave() on receiving this
     this.broadcast("gameAbandoned", {});
