@@ -3,7 +3,6 @@ import type { ErrorInfo, ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrthographicCamera } from "@react-three/drei";
 import * as Client from "colyseus.js";
-import { toast } from "sonner";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 import { Player } from "@/components/Player";
@@ -11,7 +10,7 @@ import { ParticleFloor } from "@/components/ParticleFloor";
 
 import { PulseRipple } from "@/components/game/PulseRipple";
 import { ClickHandler } from "@/components/ClickHandler";
-import { Info, Scale, Settings, Volume2, VolumeX, X } from "lucide-react";
+import { Info, Settings, Volume2, VolumeX, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSounds } from "@/hooks/use-sounds";
 // Removed: PolarAmbientParticlesCanvas, NoiseBlobFieldCanvas — hidden behind opaque R3F canvas, wasted WebGL contexts
@@ -24,7 +23,6 @@ import { NebulaBackdrop } from "@/components/game/NebulaBackdrop";
 import {
   getFloorTint,
   getPlayerDisplayLabel,
-  getPlayerHex,
   getPlayerUiLabelHex,
   PLAYER_HEX,
 } from "@/constants/playerColors";
@@ -1000,7 +998,6 @@ export const GameScreen = ({
                 spacing={SPACING}
                 gridWidth={gridWidth}
                 gridHeight={gridHeight}
-                isDevMode={isDevMode}
                 onPing={(x, y) => {
                   if (room) {
                     room.send("ping", { x, y });

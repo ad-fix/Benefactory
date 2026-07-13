@@ -1,17 +1,15 @@
 import { useRef, useMemo, useLayoutEffect, useState, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { getFloorTint, getPlayerHex } from "@/constants/playerColors";
 
 interface ParticleFloorProps {
     gridWidth?: number;
     gridHeight?: number;
     spacing?: number;
-    nodeStates?: (string | null)[][];
-    rippleTrigger?: number; // Increment this to trigger a ripple
+    rippleTrigger?: number;
 }
 
-export function ParticleFloor({ gridWidth = 10, gridHeight = 8, spacing = 2.5, nodeStates, rippleTrigger = 0 }: ParticleFloorProps) {
+export function ParticleFloor({ gridWidth = 10, gridHeight = 8, spacing = 2.5, rippleTrigger = 0 }: ParticleFloorProps) {
     const meshRef = useRef<THREE.InstancedMesh>(null);
     const [tempObject] = useState(() => new THREE.Object3D());
     const rippleStartTime = useRef<number>(-10); // Start with ripple already "finished"
@@ -48,30 +46,12 @@ export function ParticleFloor({ gridWidth = 10, gridHeight = 8, spacing = 2.5, n
     // 2. Colors array
     const colorArray = useMemo(() => {
         const array = new Float32Array(totalNodes * 3);
-        const colorMap = {
-            red: new THREE.Color(getPlayerHex("RED")),
-            blue: new THREE.Color(getPlayerHex("BLUE")),
-            green: new THREE.Color(getFloorTint("GREEN")),
-            gray: new THREE.Color("#888888"), // Neutral (tutorial)
-        };
         const defaultColor = new THREE.Color("#333333");
-
-        let i = 0;
-        for (let gx = 0; gx < gridWidth; gx++) {
-            for (let gz = 0; gz < gridHeight; gz++) {
-                const nodeState = nodeStates ? nodeStates[gx][gz] : null;
-                const color = nodeState ? colorMap[nodeState as keyof typeof colorMap] : defaultColor;
-
-                if (color) {
-                    color.toArray(array, i * 3);
-                } else {
-                    defaultColor.toArray(array, i * 3);
-                }
-                i++;
-            }
+        for (let i = 0; i < totalNodes; i++) {
+            defaultColor.toArray(array, i * 3);
         }
         return array;
-    }, [nodeStates, gridWidth, gridHeight, totalNodes]);
+    }, [totalNodes]);
 
     const uniforms = useMemo(() => ({
         uTime: { value: 0 },
