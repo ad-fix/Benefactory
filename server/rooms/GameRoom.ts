@@ -1,32 +1,7 @@
 import { Room, Client } from "colyseus";
-import { GameState, Player, Collectible, GridCell, PlayerColor, CollectibleType, CollectibleColor, CollectibleOrientation } from "../schema/GameState";
-import { CollectibleFactory } from "../collectibles";
-import { CollectibleSpawnConfig, COLLECTIBLE_PROPERTIES } from "../config/CollectibleSpawnConfig";
-import { LevelSpec, parseUnrealExport } from "../config/LevelSpec";
-import { readFileSync, existsSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { GameState, Player, PlayerColor } from "../schema/GameState";
 import { LiveKitService } from "../services/LiveKitService";
 import jwt from "jsonwebtoken";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-class SeededRNG {
-  private seed: number;
-
-  constructor(seed: number) {
-    this.seed = seed;
-  }
-
-  next(): number {
-    this.seed |= 0;
-    this.seed = this.seed + 0x6D2B79F5 | 0;
-    let t = Math.imul(this.seed ^ this.seed >>> 15, 1 | this.seed);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  }
-}
 
 interface MoveMessage {
   direction: "up" | "down" | "left" | "right";
@@ -39,22 +14,13 @@ interface PingMessage {
   y: number;
 }
 
-interface DevPaintNodeMessage {
-  x: number;
-  y: number;
-  color: string;
-}
-
 export class GameRoom extends Room<GameState> {
   maxClients = 10;
   private playerColors: PlayerColor[] = ["RED", "GREEN", "BLUE"];
   private assignedColors = new Set<PlayerColor>();
-  private stageThresholds: number[];
   private readonly MAX_GRID_SIZE = 26; // Full grid size (stage 8)
   private readonly INITIAL_VISIBLE_WIDTH = 10; // Starting visible width (stage 1)
   private readonly INITIAL_VISIBLE_HEIGHT = 8; // Starting visible height (stage 1)
-  private rng: SeededRNG;       // clue/collectible placement only
-  private collectibleSpawnConfig: CollectibleSpawnConfig;
   private userIds: Map<string, string> = new Map(); // sessionId -> userId
   private userIdToColor: Map<string, "RED" | "GREEN" | "BLUE"> = new Map(); // userId -> color for reconnection
   private spectatorSessionIds = new Set<string>();
@@ -65,7 +31,6 @@ export class GameRoom extends Room<GameState> {
   private isDevMode: boolean = false;
   private livekitService: LiveKitService;
   private livekitRoomName: string | null = null;
-  private levelSpec: LevelSpec | null = null;
   private lobbyTimeout: ReturnType<typeof setTimeout> | null = null;
   private readonly LOBBY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in ms
   private abandonTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -98,110 +63,13 @@ export class GameRoom extends Room<GameState> {
     // Initialize LiveKit service
     this.livekitService = new LiveKitService();
 
-    // Load collectible spawn configuration first to get seed
-    const configPath = join(__dirname, "../config/collectible-spawn.json");
-    const configData = readFileSync(configPath, "utf-8");
-    this.collectibleSpawnConfig = JSON.parse(configData);
-
-    // Try to load level spec — from inline JSON (levelSpecJson) or file reference (levelSpec)
-    if (options.levelSpecJson) {
-      try {
-        const parsed = typeof options.levelSpecJson === "string"
-          ? JSON.parse(options.levelSpecJson)
-          : options.levelSpecJson;
-        if (parsed.clues_per_stage) {
-          // Unreal export format
-          this.levelSpec = parseUnrealExport(parsed);
-        } else if (parsed.stages) {
-          // Native LevelSpec format
-          this.levelSpec = parsed as LevelSpec;
-        } else if (parsed.collectible_spawn_rules?.length > 0) {
-          // CollectibleSpawnConfig format — override the spawn config directly
-          console.log("Loaded inline collectible spawn config override");
-          this.collectibleSpawnConfig = parsed as CollectibleSpawnConfig;
-        } else if (options.challengeNumber != null) {
-          // TEMPORARY: DB has no spawn rules — load from Unreal-exported JSON file
-          const paddedNumber = String(options.challengeNumber).padStart(3, "0");
-          const jsonPath = join(__dirname, "../config/levels", `${paddedNumber}.json`);
-          if (existsSync(jsonPath)) {
-            const jsonData = readFileSync(jsonPath, "utf-8");
-            const jsonParsed = JSON.parse(jsonData);
-            if (jsonParsed.clues_per_stage) {
-              this.levelSpec = parseUnrealExport(jsonParsed);
-            } else if (jsonParsed.stages) {
-              this.levelSpec = jsonParsed as LevelSpec;
-            }
-            if (this.levelSpec) {
-              console.log(`[TEMP] Loaded level from ${paddedNumber}.json for challenge #${options.challengeNumber}`);
-            }
-          }
-        }
-        if (this.levelSpec) {
-          console.log(`Loaded inline level spec with ${this.levelSpec.stages.length} stages`);
-          if (this.levelSpec.custom_target_scores.length > 0) {
-            this.collectibleSpawnConfig.custom_target_scores = this.levelSpec.custom_target_scores;
-          }
-          if (this.levelSpec.seed != null) {
-            this.collectibleSpawnConfig.seed = this.levelSpec.seed;
-          }
-        }
-      } catch (err) {
-        console.warn("Failed to parse inline levelSpecJson:", err);
-      }
-    } else if (options.levelSpec) {
-      const levelSpecPath = join(__dirname, "../config/levels", options.levelSpec);
-      if (existsSync(levelSpecPath)) {
-        const levelSpecData = readFileSync(levelSpecPath, "utf-8");
-        const parsed = JSON.parse(levelSpecData);
-        if (parsed.clues_per_stage) {
-          this.levelSpec = parseUnrealExport(parsed);
-        } else if (parsed.stages) {
-          this.levelSpec = parsed as LevelSpec;
-        }
-        if (this.levelSpec) {
-          console.log(`Loaded level spec: ${options.levelSpec} with ${this.levelSpec.stages.length} stages`);
-          if (this.levelSpec.custom_target_scores.length > 0) {
-            this.collectibleSpawnConfig.custom_target_scores = this.levelSpec.custom_target_scores;
-          }
-        }
-      } else {
-        console.warn(`Level spec not found: ${levelSpecPath}`);
-      }
-    }
-
-    // Initialize RNG with seed from options, config, or random (dev mode)
-    let seed: number;
-    if (options.devMode) {
-      seed = Math.floor(Math.random() * 2147483647);
-      console.log("Dev mode: using random seed:", seed);
-    } else if (options.seed) {
-      seed = Number(options.seed) || (this.collectibleSpawnConfig.seed ?? Math.floor(Math.random() * 2147483647));
-    } else {
-      seed = this.collectibleSpawnConfig.seed ?? Math.floor(Math.random() * 2147483647);
-    }
-    this.rng = new SeededRNG(seed);
-    console.log("RNG initialized with seed:", seed);
-
-    this.stageThresholds = this.collectibleSpawnConfig.custom_target_scores || [];
-    console.log("Loaded collectible spawn config:", this.collectibleSpawnConfig);
-    console.log("Stage thresholds:", this.stageThresholds);
-
+    const seed = Math.floor(Math.random() * 2147483647);
     this.setState(new GameState());
     this.state.seed = seed;
-
-    // Set initial visible grid size
     this.state.gridWidth = this.INITIAL_VISIBLE_WIDTH;
     this.state.gridHeight = this.INITIAL_VISIBLE_HEIGHT;
 
-    // Set stage thresholds from config
-    this.state.stageThresholds.push(...this.stageThresholds);
-
-    // Initialize scores
-    this.state.scores.set("RED", 0);
-    this.state.scores.set("GREEN", 0);
-    this.state.scores.set("BLUE", 0);
-
-    console.log("Initial state set, scores initialized");
+    console.log("Initial state set");
 
     // Handle player movement
     this.onMessage("move", (client, message: MoveMessage) => {
@@ -264,22 +132,10 @@ export class GameRoom extends Room<GameState> {
         }
       });
 
-      // Only move and paint if not blocked
+      // Only move if not blocked
       if (!isBlocked) {
         player.x = newX;
         player.y = newY;
-
-        // Paint the cell
-        const cellKey = `${newX},${newY}`;
-        let cell = this.state.gridColors.get(cellKey);
-        if (!cell) {
-          cell = new GridCell();
-          this.state.gridColors.set(cellKey, cell);
-        }
-        cell.color = player.color;
-
-        // Recalculate scores
-        this.calculateScores();
 
         // Log move for replay
         this.logEvent({ e: "move", p: this.userIds.get(playerKey) || playerKey, d: direction, x: newX, y: newY });
@@ -319,44 +175,9 @@ export class GameRoom extends Room<GameState> {
       if (!this.isDevMode || !this.state.gameStarted) return;
       const nextStage = this.state.stage + 1;
       if (nextStage <= 8) {
-        console.log(`[Dev Mode] Manual stage up from ${this.state.stage} to ${nextStage}. Score: ${this.state.totalScore}`);
+        console.log(`[Dev Mode] Manual stage up from ${this.state.stage} to ${nextStage}.`);
         this.advanceToStage(nextStage);
       }
-    });
-
-    // Handle dev mode node painting
-    this.onMessage("devPaintNode", (_client, message: DevPaintNodeMessage) => {
-      if (!this.isDevMode || !this.state.gameStarted) return;
-
-      const { x, y, color } = message;
-      const cellKey = `${x},${y}`;
-
-      // Get or create the grid cell
-      let cell = this.state.gridColors.get(cellKey);
-      if (!cell) {
-        cell = new GridCell();
-        this.state.gridColors.set(cellKey, cell);
-      }
-
-      // Set the color
-      cell.color = color as any;
-
-      // Recalculate scores
-      this.calculateScores();
-
-      console.log(`[Dev Mode] Painted node at (${x}, ${y}) with color ${color}`);
-    });
-
-    // Handle dev mode node clearing (right-click to make neutral)
-    this.onMessage("devClearNode", (_client, message: { x: number; y: number }) => {
-      if (!this.isDevMode || !this.state.gameStarted) return;
-
-      const { x, y } = message;
-      const cellKey = `${x},${y}`;
-      this.state.gridColors.delete(cellKey);
-      this.calculateScores();
-
-      console.log(`[Dev Mode] Cleared node at (${x}, ${y})`);
     });
 
     console.log("GameRoom created!");
@@ -593,12 +414,6 @@ export class GameRoom extends Room<GameState> {
 
     this.state.players.set(client.sessionId, player);
 
-    // Paint initial cell
-    const cellKey = `${player.x},${player.y}`;
-    const cell = new GridCell();
-    cell.color = player.color;
-    this.state.gridColors.set(cellKey, cell);
-
     console.log(`Total players now: ${this.state.players.size}`);
 
     // In solo mode, create the remaining 2 players and start immediately
@@ -621,12 +436,6 @@ export class GameRoom extends Room<GameState> {
         soloPlayer.y = positions[color].y;
 
         this.state.players.set(soloPlayer.sessionId, soloPlayer);
-
-        // Paint initial cell
-        const soloCellKey = `${soloPlayer.x},${soloPlayer.y}`;
-        const soloCell = new GridCell();
-        soloCell.color = soloPlayer.color;
-        this.state.gridColors.set(soloCellKey, soloCell);
 
         console.log(`Solo mode: Created ${color} player at (${soloPlayer.x}, ${soloPlayer.y})`);
       }
@@ -743,10 +552,6 @@ export class GameRoom extends Room<GameState> {
 
     console.log(`Game mode: ${this.isSoloMode ? 'SOLO' : 'MULTIPLAYER'}`);
 
-    // Generate initial collectibles
-    this.generateInitialCollectibles();
-    this.calculateScores();
-
     // Initialize LiveKit voice chat (only in multiplayer mode)
     if (!this.isSoloMode) {
       await this.initializeVoiceChat();
@@ -856,16 +661,6 @@ export class GameRoom extends Room<GameState> {
         this.state.timeRemaining--;
       }
 
-      // Log score snapshot every 30 seconds for replay
-      const elapsed = this.GAME_DURATION - this.state.timeRemaining;
-      if (elapsed > 0 && elapsed % 30 === 0) {
-        const scoreSnapshot: Record<string, unknown> = { e: "score", total: this.state.totalScore };
-        this.state.players.forEach((p, sessionId) => {
-          scoreSnapshot[this.userIds.get(sessionId) || sessionId] = this.state.scores.get(p.color) || 0;
-        });
-        this.logEvent(scoreSnapshot);
-      }
-
       if (this.state.timeRemaining <= 0 && !this.state.isGameOver && !this.isDevMode) {
         this.endGame();
       }
@@ -880,7 +675,7 @@ export class GameRoom extends Room<GameState> {
 
     this.state.isGameOver = true;
 
-    console.log("Game ended! Final score:", this.state.highScore);
+    console.log("Game ended!");
 
     await this.endPolarWindsSession();
 
@@ -901,530 +696,14 @@ export class GameRoom extends Room<GameState> {
     // disposes.
   }
 
-  private async updateHighScore(_score: number) {
-    // (removed) Standalone build has no persistence. This previously persisted the
-    // session's high score to a platform endpoint. The high score still lives in
-    // room state (this.state.highScore) for the duration of the session.
-  }
-
-  private generateInitialCollectibles() {
-    // Use level spec if available, otherwise use random spawn rules
-    if (this.levelSpec && this.levelSpec.stages.length > 0) {
-      this.spawnCluesFromLevelSpec(1);
-      console.log(`Generated ${this.state.collectibles.length} initial collectibles from level spec`);
-      return;
-    }
-
-    const colors: PlayerColor[] = ["RED", "GREEN", "BLUE"];
-    const collectibleCounters = new Map<CollectibleType, number>();
-
-    // Calculate center offset for the 26x26 grid
-    const center = Math.floor(this.MAX_GRID_SIZE / 2);
-    const halfWidth = Math.floor(this.INITIAL_VISIBLE_WIDTH / 2);
-    const halfHeight = Math.floor(this.INITIAL_VISIBLE_HEIGHT / 2);
-    const minX = center - halfWidth;
-    const maxX = center + halfWidth - 1;
-    const minY = center - halfHeight;
-    const maxY = center + halfHeight - 1;
-
-    // Spawn collectibles based on config for stage 1
-    for (const rule of this.collectibleSpawnConfig.collectible_spawn_rules) {
-      if (rule.first_stage !== 1) continue;
-
-      const counter = collectibleCounters.get(rule.clue_type) || 0;
-      collectibleCounters.set(rule.clue_type, counter);
-
-      const props = COLLECTIBLE_PROPERTIES[rule.clue_type];
-      const spawnsOnNodes = props.spawnsOnNodes;
-
-      if (props.isNeutral) {
-        // Neutral collectibles: spawn num_initial total (not per color)
-        for (let i = 0; i < rule.num_initial; i++) {
-          const collectible = new Collectible();
-          const currentCount = collectibleCounters.get(rule.clue_type)!;
-          collectible.id = `NEUTRAL-${rule.clue_type}-${currentCount}`;
-          collectibleCounters.set(rule.clue_type, currentCount + 1);
-          collectible.color = "NEUTRAL";
-          collectible.type = rule.clue_type;
-
-          const handler = CollectibleFactory.getHandler(rule.clue_type);
-          let x: number, y: number;
-          do {
-            if (!spawnsOnNodes) {
-              // Spawn at half-integer positions (between nodes)
-              x = minX + Math.floor(this.rng.next() * (this.INITIAL_VISIBLE_WIDTH - 1)) + 0.5;
-              y = minY + Math.floor(this.rng.next() * (this.INITIAL_VISIBLE_HEIGHT - 1)) + 0.5;
-            } else {
-              x = minX + Math.floor(this.rng.next() * this.INITIAL_VISIBLE_WIDTH);
-              y = minY + Math.floor(this.rng.next() * this.INITIAL_VISIBLE_HEIGHT);
-            }
-          } while (this.isPositionOccupied(x, y) || !handler.validateSpawnPosition({
-            x,
-            y,
-            minBound: Math.min(minX, minY),
-            maxBound: Math.max(maxX, maxY),
-            color: "RED", // Color doesn't matter for neutral validation
-            existingCollectibles: Array.from(this.state.collectibles),
-            gridMinX: minX,
-            gridMaxX: maxX,
-            gridMinY: minY,
-            gridMaxY: maxY,
-          }));
-
-          collectible.x = x;
-          collectible.y = y;
-
-          // Assign random orientation for collectibles that spawn between nodes
-          if (!spawnsOnNodes) {
-            const orientations: CollectibleOrientation[] = [0, 90, 180, 270];
-            collectible.orientation = orientations[Math.floor(this.rng.next() * 4)];
-            collectible.isFlipped = this.rng.next() < 0.5;
-          }
-
-          this.state.collectibles.push(collectible);
-        }
-      } else {
-        // Color-based collectibles: spawn num_initial per color
-        for (const color of colors) {
-          for (let i = 0; i < rule.num_initial; i++) {
-            const collectible = new Collectible();
-            const currentCount = collectibleCounters.get(rule.clue_type)!;
-            collectible.id = `${color}-${rule.clue_type}-${currentCount}`;
-            collectibleCounters.set(rule.clue_type, currentCount + 1);
-            collectible.color = color;
-            collectible.type = rule.clue_type;
-
-            const handler = CollectibleFactory.getHandler(rule.clue_type);
-            let x: number, y: number;
-            do {
-              if (!spawnsOnNodes) {
-                // Spawn at half-integer positions (between nodes)
-                x = minX + Math.floor(this.rng.next() * (this.INITIAL_VISIBLE_WIDTH - 1)) + 0.5;
-                y = minY + Math.floor(this.rng.next() * (this.INITIAL_VISIBLE_HEIGHT - 1)) + 0.5;
-              } else {
-                x = minX + Math.floor(this.rng.next() * this.INITIAL_VISIBLE_WIDTH);
-                y = minY + Math.floor(this.rng.next() * this.INITIAL_VISIBLE_HEIGHT);
-              }
-            } while (this.isPositionOccupied(x, y) || !handler.validateSpawnPosition({
-              x,
-              y,
-              minBound: Math.min(minX, minY),
-              maxBound: Math.max(maxX, maxY),
-              color,
-              existingCollectibles: Array.from(this.state.collectibles),
-              gridMinX: minX,
-              gridMaxX: maxX,
-              gridMinY: minY,
-              gridMaxY: maxY,
-            }));
-
-            collectible.x = x;
-            collectible.y = y;
-
-            // Assign random orientation for collectibles that spawn between nodes
-            if (!spawnsOnNodes) {
-              const orientations: CollectibleOrientation[] = [0, 90, 180, 270];
-              collectible.orientation = orientations[Math.floor(this.rng.next() * 4)];
-            }
-
-            this.state.collectibles.push(collectible);
-          }
-        }
-      }
-    }
-
-    console.log(`Generated ${this.state.collectibles.length} initial collectibles`);
-  }
-
-  private spawnCluesFromLevelSpec(stage: number) {
-    if (!this.levelSpec) return;
-
-    // Stage is 1-indexed, array is 0-indexed
-    const stageIndex = stage - 1;
-    if (stageIndex < 0 || stageIndex >= this.levelSpec.stages.length) {
-      console.log(`No level spec data for stage ${stage}`);
-      return;
-    }
-
-    const stageData = this.levelSpec.stages[stageIndex];
-    const center = Math.floor(this.MAX_GRID_SIZE / 2);
-
-    // Spawn clues
-    for (const clue of stageData.clues) {
-      const collectible = new Collectible();
-      collectible.id = `${clue.color}-${clue.type}-${this.state.collectibles.length}`;
-      collectible.type = clue.type;
-      collectible.color = clue.color;
-      // Convert level spec coordinates (centered at 0,0) to grid coordinates
-      // Unreal uses center at floor((size-1)/2), we use floor(size/2), so offset by 1
-      collectible.x = center + clue.x - 1;
-      collectible.y = center + clue.y - 1;
-      collectible.orientation = clue.orientation || 0;
-      collectible.isFlipped = clue.isFlipped || false;
-
-      // Store polyomino shape if present
-      if (clue.shape) {
-        collectible.shapeData = JSON.stringify(clue.shape);
-      }
-
-      this.state.collectibles.push(collectible);
-    }
-
-    console.log(`Spawned ${stageData.clues.length} clues for stage ${stage} from level spec`);
-  }
-
-  private isPositionOccupied(x: number, y: number): boolean {
-    // Check if any player is at this position
-    for (const [, player] of this.state.players) {
-      if (player.x === x && player.y === y) return true;
-    }
-
-    // Check if any collectible is at this position
-    for (const collectible of this.state.collectibles) {
-      if (collectible.x === x && collectible.y === y) return true;
-    }
-
-    return false;
-  }
-
-  private calculateScores() {
-    const scores: Record<PlayerColor, number> = {
-      RED: 0,
-      GREEN: 0,
-      BLUE: 0,
-    };
-
-    const colors: PlayerColor[] = ["RED", "GREEN", "BLUE"];
-
-
-    /* Only clear activation when needed — writing every collectible every move
-       explodes Colyseus patch size and freezes clients on large clue counts. */
-    for (const collectible of this.state.collectibles) {
-      if (collectible.isActivated) {
-        collectible.isActivated = false;
-      }
-    }
-
-    const allCollectiblesList = Array.from(this.state.collectibles);
-
-    for (const color of colors) {
-      const components = this.findConnectedComponents(color);
-
-      // Get all collectibles for this color
-      const colorCollectibles = allCollectiblesList.filter(
-        (c) => c.color === color
-      );
-
-      // Process each collectible using its handler
-      for (const collectible of colorCollectibles) {
-        const handler = CollectibleFactory.getHandler(collectible.type);
-        const score = handler.process({
-          collectible,
-          gridColors: this.state.gridColors,
-          allCollectibles: allCollectiblesList,
-          color,
-          components,
-        });
-        if (collectible.score !== score) {
-          collectible.score = score;
-        }
-        scores[color] += score;
-      }
-    }
-
-    // Process neutral collectibles - score is split equally among all players
-    const neutralCollectibles = allCollectiblesList.filter(
-      (c) => c.color === "NEUTRAL"
-    );
-
-    for (const collectible of neutralCollectibles) {
-      const handler = CollectibleFactory.getHandler(collectible.type);
-      const score = handler.process({
-        collectible,
-        gridColors: this.state.gridColors,
-        allCollectibles: allCollectiblesList,
-        color: "RED", // Color doesn't matter for neutral collectibles
-        components: [],
-      });
-      if (collectible.score !== score) {
-        collectible.score = score;
-      }
-      // Split score equally among all players
-      const scorePerPlayer = score / 3;
-      scores.RED += scorePerPlayer;
-      scores.GREEN += scorePerPlayer;
-      scores.BLUE += scorePerPlayer;
-    }
-
-    // Update state (skip unchanged map entries to shrink encoded patches)
-    const nextTotal = scores.RED + scores.GREEN + scores.BLUE;
-    if (this.state.scores.get("RED") !== scores.RED) {
-      this.state.scores.set("RED", scores.RED);
-    }
-    if (this.state.scores.get("GREEN") !== scores.GREEN) {
-      this.state.scores.set("GREEN", scores.GREEN);
-    }
-    if (this.state.scores.get("BLUE") !== scores.BLUE) {
-      this.state.scores.set("BLUE", scores.BLUE);
-    }
-
-    if (this.state.totalScore !== nextTotal) {
-      this.state.totalScore = nextTotal;
-    }
-
-    // Update high score if total score increased
-    if (this.state.totalScore > this.state.highScore) {
-      this.state.highScore = this.state.totalScore;
-      this.updateHighScore(this.state.highScore);
-    }
-
-    // Check for stage advancement
-    this.checkStageAdvancement();
-
-  }
-
-  private findConnectedComponents(
-    color: PlayerColor
-  ): Array<Array<{ x: number; y: number }>> {
-    const visited = new Set<string>();
-    const components: Array<Array<{ x: number; y: number }>> = [];
-
-    for (const [key, cell] of this.state.gridColors) {
-      if (cell.color !== color || visited.has(key)) continue;
-
-      const [x, y] = key.split(",").map(Number);
-      const component = this.bfs(x, y, color, visited);
-
-      if (component.length > 0) {
-        components.push(component);
-      }
-    }
-
-    return components;
-  }
-
-  private bfs(
-    startX: number,
-    startY: number,
-    color: PlayerColor,
-    visited: Set<string>
-  ): Array<{ x: number; y: number }> {
-    const queue: Array<{ x: number; y: number }> = [
-      { x: startX, y: startY },
-    ];
-    const component: Array<{ x: number; y: number }> = [];
-    const startKey = `${startX},${startY}`;
-
-    visited.add(startKey);
-
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      component.push(current);
-
-      const neighbors = [
-        { x: current.x - 1, y: current.y },
-        { x: current.x + 1, y: current.y },
-        { x: current.x, y: current.y - 1 },
-        { x: current.x, y: current.y + 1 },
-      ];
-
-      for (const neighbor of neighbors) {
-        const key = `${neighbor.x},${neighbor.y}`;
-
-        if (visited.has(key)) continue;
-
-        const cell = this.state.gridColors.get(key);
-        if (cell && cell.color === color) {
-          visited.add(key);
-          queue.push(neighbor);
-        }
-      }
-    }
-
-    return component;
-  }
-
-  private checkStageAdvancement() {
-    // In dev mode, stage ups are manual only
-    if (this.isDevMode) return;
-
-    // Determine what stage we should be at based on total score
-    let targetStage = 1;
-    for (let i = 0; i < this.stageThresholds.length; i++) {
-      if (this.state.totalScore >= this.stageThresholds[i]) {
-        targetStage = i + 2; // Stage 2 at threshold[0], Stage 3 at threshold[1], etc.
-      }
-    }
-
-    // If we need to advance stages
-    if (targetStage > this.state.stage) {
-      console.log(`Advancing from stage ${this.state.stage} to stage ${targetStage}`);
-      this.advanceToStage(targetStage);
-    }
-  }
-
   private advanceToStage(newStage: number) {
-    // Log stage advance for replay
     this.logEvent({ e: "stage", stage: newStage });
-
     const oldGridWidth = this.state.gridWidth;
     const oldGridHeight = this.state.gridHeight;
-    const previousStage = this.state.stage;
     this.state.stage = newStage;
-
-    // Simply expand the visible area by 2 per stage
-    // Stage 1: 10x8, Stage 2: 12x10, ..., max is 26x26
-    this.state.gridWidth = Math.min(
-      this.INITIAL_VISIBLE_WIDTH + (newStage - 1) * 2,
-      this.MAX_GRID_SIZE
-    );
-    this.state.gridHeight = Math.min(
-      this.INITIAL_VISIBLE_HEIGHT + (newStage - 1) * 2,
-      this.MAX_GRID_SIZE
-    );
-
-    // Use level spec if available
-    if (this.levelSpec) {
-      const stagesAdvanced = newStage - previousStage;
-      for (let s = 0; s < stagesAdvanced; s++) {
-        const currentStage = previousStage + s + 1;
-        this.spawnCluesFromLevelSpec(currentStage);
-      }
-      console.log(`Stage ${newStage}: Visible area expanded from ${oldGridWidth}x${oldGridHeight} to ${this.state.gridWidth}x${this.state.gridHeight} (using level spec)`);
-      return;
-    }
-
-    // Add new collectibles for each stage advancement
-    const colors: PlayerColor[] = ["RED", "GREEN", "BLUE"];
-    const center = Math.floor(this.MAX_GRID_SIZE / 2);
-    const halfWidth = Math.floor(this.state.gridWidth / 2);
-    const halfHeight = Math.floor(this.state.gridHeight / 2);
-    const minX = center - halfWidth;
-    const maxX = center + halfWidth - 1;
-    const minY = center - halfHeight;
-    const maxY = center + halfHeight - 1;
-
-    const stagesAdvanced = newStage - previousStage;
-    let totalCollectiblesAdded = 0;
-
-    for (let s = 0; s < stagesAdvanced; s++) {
-      const currentStage = previousStage + s + 1;
-
-      // Spawn collectibles based on config
-      for (const rule of this.collectibleSpawnConfig.collectible_spawn_rules) {
-        // Check if this collectible type should spawn at this stage
-        if (currentStage < rule.first_stage) continue;
-
-        // For the first_stage, use num_initial, otherwise use num_subsequent
-        const numToSpawn = currentStage === rule.first_stage ? rule.num_initial : rule.num_subsequent;
-
-        const props = COLLECTIBLE_PROPERTIES[rule.clue_type];
-        const spawnsOnNodes = props.spawnsOnNodes;
-
-        if (props.isNeutral) {
-          // Neutral collectibles: spawn numToSpawn total (not per color)
-          for (let i = 0; i < numToSpawn; i++) {
-            const collectible = new Collectible();
-            collectible.id = `NEUTRAL-${rule.clue_type}-${this.state.collectibles.length}`;
-            collectible.color = "NEUTRAL";
-            collectible.type = rule.clue_type;
-
-            const handler = CollectibleFactory.getHandler(rule.clue_type);
-            let x: number, y: number;
-            let attempts = 0;
-            const maxAttempts = 100;
-
-            do {
-              attempts++;
-              if (!spawnsOnNodes) {
-                // Spawn at half-integer positions (between nodes)
-                x = minX + Math.floor(this.rng.next() * (this.state.gridWidth - 1)) + 0.5;
-                y = minY + Math.floor(this.rng.next() * (this.state.gridHeight - 1)) + 0.5;
-              } else {
-                x = minX + Math.floor(this.rng.next() * this.state.gridWidth);
-                y = minY + Math.floor(this.rng.next() * this.state.gridHeight);
-              }
-            } while ((this.isPositionOccupied(x, y) || !handler.validateSpawnPosition({
-              x,
-              y,
-              minBound: Math.min(minX, minY),
-              maxBound: Math.max(maxX, maxY),
-              color: "RED",
-              existingCollectibles: Array.from(this.state.collectibles),
-              gridMinX: minX,
-              gridMaxX: maxX,
-              gridMinY: minY,
-              gridMaxY: maxY,
-            })) && attempts < maxAttempts);
-
-            collectible.x = x;
-            collectible.y = y;
-
-            // Assign random orientation for collectibles that spawn between nodes
-            if (!spawnsOnNodes) {
-              const orientations: CollectibleOrientation[] = [0, 90, 180, 270];
-              collectible.orientation = orientations[Math.floor(this.rng.next() * 4)];
-              collectible.isFlipped = this.rng.next() < 0.5;
-            }
-
-            this.state.collectibles.push(collectible);
-            totalCollectiblesAdded++;
-          }
-        } else {
-          // Color-based collectibles: spawn numToSpawn per color
-          for (const color of colors) {
-            for (let i = 0; i < numToSpawn; i++) {
-              const collectible = new Collectible();
-              collectible.id = `${color}-${rule.clue_type}-${this.state.collectibles.length}`;
-              collectible.color = color;
-              collectible.type = rule.clue_type;
-
-              const handler = CollectibleFactory.getHandler(rule.clue_type);
-              let x: number, y: number;
-              let attempts = 0;
-              const maxAttempts = 100;
-
-              do {
-                attempts++;
-                if (!spawnsOnNodes) {
-                  // Spawn at half-integer positions (between nodes)
-                  x = minX + Math.floor(this.rng.next() * (this.state.gridWidth - 1)) + 0.5;
-                  y = minY + Math.floor(this.rng.next() * (this.state.gridHeight - 1)) + 0.5;
-                } else {
-                  x = minX + Math.floor(this.rng.next() * this.state.gridWidth);
-                  y = minY + Math.floor(this.rng.next() * this.state.gridHeight);
-                }
-              } while ((this.isPositionOccupied(x, y) || !handler.validateSpawnPosition({
-                x,
-                y,
-                minBound: Math.min(minX, minY),
-                maxBound: Math.max(maxX, maxY),
-                color,
-                existingCollectibles: Array.from(this.state.collectibles),
-                gridMinX: minX,
-                gridMaxX: maxX,
-                gridMinY: minY,
-                gridMaxY: maxY,
-              })) && attempts < maxAttempts);
-
-              collectible.x = x;
-              collectible.y = y;
-
-              // Assign random orientation for collectibles that spawn between nodes
-              if (!spawnsOnNodes) {
-                const orientations: CollectibleOrientation[] = [0, 90, 180, 270];
-                collectible.orientation = orientations[Math.floor(this.rng.next() * 4)];
-              }
-
-              this.state.collectibles.push(collectible);
-              totalCollectiblesAdded++;
-            }
-          }
-        }
-      }
-    }
-
-    console.log(`Stage ${newStage}: Visible area expanded from ${oldGridWidth}x${oldGridHeight} to ${this.state.gridWidth}x${this.state.gridHeight}, added ${totalCollectiblesAdded} new collectibles`);
+    this.state.gridWidth = Math.min(this.INITIAL_VISIBLE_WIDTH + (newStage - 1) * 2, this.MAX_GRID_SIZE);
+    this.state.gridHeight = Math.min(this.INITIAL_VISIBLE_HEIGHT + (newStage - 1) * 2, this.MAX_GRID_SIZE);
+    console.log(`Stage ${newStage}: Visible area expanded from ${oldGridWidth}x${oldGridHeight} to ${this.state.gridWidth}x${this.state.gridHeight}`);
   }
 
 }

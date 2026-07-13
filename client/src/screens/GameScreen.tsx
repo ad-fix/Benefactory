@@ -9,17 +9,8 @@ import * as THREE from "three";
 import { Player } from "@/components/Player";
 import { ParticleFloor } from "@/components/ParticleFloor";
 
-import { CubeFrame } from "@/components/CubeFrame";
-import { Hand } from "@/components/Hand";
-import { EquilateralTriangle } from "@/components/EquilateralTriangle";
-import { Compass } from "@/components/Compass";
-import { GalaxyModel } from "@/components/GalaxyModel";
-import { Polyomino } from "@/components/Polyomino";
-import { GoldAura } from "@/components/GoldAura";
 import { PulseRipple } from "@/components/game/PulseRipple";
-import { FloatingScore } from "@/components/FloatingScore";
 import { ClickHandler } from "@/components/ClickHandler";
-import { LambdaSymbol } from "@/components/LambdaSymbol";
 import { Info, Scale, Settings, Volume2, VolumeX, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSounds } from "@/hooks/use-sounds";
@@ -36,14 +27,11 @@ import {
   getPlayerHex,
   getPlayerUiLabelHex,
   PLAYER_HEX,
-  PLAYER_HEX_LOWER,
 } from "@/constants/playerColors";
 
 // Types
 type PlayerColor = "RED" | "GREEN" | "BLUE";
 type ClueColorLower = "red" | "green" | "blue";
-type CollectibleType = "network" | "box" | "equilibrium" | "clone" | "vantage" | "galaxy" | "polyomino";
-type CollectibleOrientation = 0 | 90 | 180 | 270;
 
 interface PlayerState {
   x: number;
@@ -53,19 +41,6 @@ interface PlayerState {
   name: string;
   school: string;
   discordName: string;
-}
-
-interface Collectible {
-  x: number;
-  y: number;
-  color: string;
-  id: string;
-  type: CollectibleType;
-  isActivated: boolean;
-  isGold: boolean;
-  orientation: CollectibleOrientation;
-  isFlipped: boolean;
-  score: number;
 }
 
 interface Ping {
@@ -80,16 +55,6 @@ const COLOR_MAP_LOWER: Record<PlayerColor, ClueColorLower> = {
   RED: "red",
   GREEN: "green",
   BLUE: "blue",
-};
-
-/** Stage score bar fill (bottom → top), aligned with board color identity. */
-const NEUTRAL_BAR_GRADIENT =
-  "linear-gradient(to top, #1e293b 0%, #334155 12%, #475569 24%, #64748b 38%, #94a3b8 54%, #cbd5e1 68%, #e2e8f0 82%, #f1f5f9 92%, #ffffff 100%)";
-
-const SCORE_BAR_GRADIENT: Record<PlayerColor, string> = {
-  RED: NEUTRAL_BAR_GRADIENT,
-  GREEN: NEUTRAL_BAR_GRADIENT,
-  BLUE: NEUTRAL_BAR_GRADIENT,
 };
 
 const CONTROL_KEYS = {
@@ -215,165 +180,14 @@ const SmoothZoom = ({
   return null;
 };
 
-// Connection Lines Component — batched into a single InstancedMesh
-const colorMap: Record<string, THREE.Color> = {
-  red: new THREE.Color(PLAYER_HEX_LOWER.red),
-  blue: new THREE.Color(PLAYER_HEX_LOWER.blue),
-  green: new THREE.Color(PLAYER_HEX_LOWER.green),
-};
-
-// Shared geometry for all line segments (thin cylinder along Y)
-// Quaternions for horizontal (along X) and vertical (along Z) lines
-const quatHorizontal = new THREE.Quaternion().setFromUnitVectors(
-  new THREE.Vector3(0, 1, 0),
-  new THREE.Vector3(1, 0, 0),
-);
-const quatVertical = new THREE.Quaternion().setFromUnitVectors(
-  new THREE.Vector3(0, 1, 0),
-  new THREE.Vector3(0, 0, 1),
-);
-
-const lineVertexShader = `
-  attribute vec3 instanceColor;
-  varying vec2 vUv;
-  varying vec3 vColor;
-  void main() {
-    vUv = uv;
-    vColor = instanceColor;
-    gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
-  }
-`;
-
-const lineFragmentShader = `
-  uniform float uTime;
-  uniform float uRepeats;
-  varying vec2 vUv;
-  varying vec3 vColor;
-
-  void main() {
-    float t = -uTime * 1.0;
-    float progress = vUv.y * uRepeats + t;
-    float dash = step(0.5, fract(progress));
-    if (dash < 0.5) discard;
-    gl_FragColor = vec4(vColor * 0.4, 1.0);
-  }
-`;
-
-const ConnectionLines = ({ nodeStates, gridWidth, gridHeight }: { nodeStates: (string | null)[][], gridWidth: number, gridHeight: number }) => {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-
-  const lines = useMemo(() => {
-    const items: { px: number; pz: number; horizontal: boolean; color: string }[] = [];
-    const offsetX = (gridWidth - 1) / 2;
-    const offsetZ = (gridHeight - 1) / 2;
-
-    for (let x = 0; x < gridWidth; x++) {
-      for (let z = 0; z < gridHeight; z++) {
-        const color = nodeStates[x][z];
-        if (!color || color === "gray") continue;
-
-        if (x < gridWidth - 1 && nodeStates[x + 1][z] === color) {
-          items.push({
-            px: (x + 0.5 - offsetX) * SPACING,
-            pz: (z - offsetZ) * SPACING,
-            horizontal: true,
-            color,
-          });
-        }
-        if (z < gridHeight - 1 && nodeStates[x][z + 1] === color) {
-          items.push({
-            px: (x - offsetX) * SPACING,
-            pz: (z + 0.5 - offsetZ) * SPACING,
-            horizontal: false,
-            color,
-          });
-        }
-      }
-    }
-    return items;
-  }, [nodeStates, gridWidth, gridHeight]);
-
-  const maxCount = gridWidth * gridHeight * 2;
-
-  const colorArray = useMemo(() => new Float32Array(maxCount * 3), [maxCount]);
-
-  const uniforms = useMemo(() => ({
-    uTime: { value: 0 },
-    uRepeats: { value: SPACING * 4.0 },
-  }), []);
-
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-
-    const dummy = new THREE.Object3D();
-    const col = new THREE.Color();
-
-    for (let i = 0; i < lines.length; i++) {
-      const l = lines[i];
-      dummy.position.set(l.px, -2.5, l.pz);
-      dummy.quaternion.copy(l.horizontal ? quatHorizontal : quatVertical);
-      dummy.scale.set(1, 1, 1);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
-
-      col.copy(colorMap[l.color] ?? colorMap.red);
-      colorArray[i * 3] = col.r;
-      colorArray[i * 3 + 1] = col.g;
-      colorArray[i * 3 + 2] = col.b;
-    }
-
-    mesh.count = lines.length;
-    mesh.instanceMatrix.needsUpdate = true;
-
-    const colorAttr = mesh.geometry.getAttribute("instanceColor") as THREE.InstancedBufferAttribute;
-    if (colorAttr) colorAttr.needsUpdate = true;
-  }, [lines, colorArray]);
-
-  useFrame((state) => {
-    uniforms.uTime.value = state.clock.elapsedTime;
-  });
-
-  return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, maxCount]}>
-      <cylinderGeometry args={[0.04, 0.04, SPACING, 6]}>
-        <instancedBufferAttribute attach="attributes-instanceColor" args={[colorArray, 3]} />
-      </cylinderGeometry>
-      <shaderMaterial
-        vertexShader={lineVertexShader}
-        fragmentShader={lineFragmentShader}
-        uniforms={uniforms}
-        vertexColors={true}
-        transparent={true}
-        side={THREE.DoubleSide}
-      />
-    </instancedMesh>
-  );
-};
-
-// Lambda Component (static)
-const SpinningLambda = ({ color, connected }: { color: string; connected: boolean }) => {
-  return (
-    <group>
-      <LambdaSymbol color={color} scale={1.0} connected={connected} />
-    </group>
-  );
-};
-
 interface GameScreenProps {
   room: Client.Room | null;
   players: Map<string, PlayerState>;
-  gridColors: Map<string, PlayerColor>;
-  collectibles: Collectible[];
   gridWidth: number;
   gridHeight: number;
   myColor: PlayerColor | null;
   isSoloMode: boolean;
-  scores: Record<PlayerColor, number>;
-  totalScore: number;
-  highScore: number;
   stage: number;
-  stageThresholds: number[];
   timeRemaining: number;
   isDevMode: boolean;
   seed: number;
@@ -464,17 +278,11 @@ const PolarSlider = ({
 export const GameScreen = ({
   room,
   players,
-  gridColors,
-  collectibles,
   gridWidth,
   gridHeight,
   myColor,
   isSoloMode,
-  scores,
-  totalScore,
-  highScore,
   stage,
-  stageThresholds,
   timeRemaining,
   isDevMode,
   seed,
@@ -491,10 +299,8 @@ export const GameScreen = ({
   const [activePlayerIndex, setActivePlayerIndex] = useState(0);
   const [pings, setPings] = useState<Ping[]>([]);
   const [rippleTrigger, setRippleTrigger] = useState(0);
-  const [barBloom, setBarBloom] = useState(0); // 0 = off, >0 = intensity
   const [controlsOpen, setControlsOpen] = useState(false);
   const [predictedPos, setPredictedPos] = useState<{ x: number, y: number } | null>(null);
-  const [predictedGridColors, setPredictedGridColors] = useState<Map<string, PlayerColor | "clear">>(new Map());
   const settingsCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const SETTINGS_CLOSE_MS = 300;
 
@@ -521,21 +327,6 @@ export const GameScreen = ({
   const seqCounterRef = useRef(0);
   const lastRepeatTimeRef = useRef(0);
   const prevStageRef = useRef(stage);
-  // Floating score animations
-  const [floatingScores, setFloatingScores] = useState<Array<{
-    id: string;
-    collectibleId: string;
-    position: [number, number, number];
-    score: number;
-    timestamp: number;
-  }>>([]);
-  const prevScoresRef = useRef<Map<string, number>>(new Map());
-  const collectiblesRef = useRef(collectibles);
-  collectiblesRef.current = collectibles;
-  const collectiblesScoreSig = useMemo(
-    () => collectibles.map((c) => `${c.id}:${c.score}`).join("|"),
-    [collectibles],
-  );
 
   // Score burst overlay ref
   // Noise field overlay ref (flashes on stage change)
@@ -544,34 +335,6 @@ export const GameScreen = ({
   // Dev: client-side stage override for effects testing (does NOT affect game)
   const [fakeStage, setFakeStage] = useState<number | null>(null);
   const effectiveStage = fakeStage ?? stage;
-
-  // Main score bar floating score
-  const [mainScoreFloating, setMainScoreFloating] = useState<{
-    score: number;
-    id: string;
-  } | null>(null);
-  const prevTotalScoreRef = useRef(totalScore);
-
-  const currentStageThreshold = stage < 8 && stageThresholds.length > 0
-    ? stageThresholds[stage - 1]
-    : (stageThresholds[stageThresholds.length - 1] || 0);
-
-  const scoreBarFillPercent = Math.min(
-    (totalScore / (currentStageThreshold || 1)) * 100,
-    100,
-  );
-  const highScoreBarPercent = Math.min(
-    (highScore / (currentStageThreshold || 1)) * 100,
-    100,
-  );
-
-  const scoreBarGradient = useMemo(() => {
-    const playerArray = Array.from(players.values());
-    const c: PlayerColor = isSoloMode
-      ? playerArray[activePlayerIndex]?.color ?? "RED"
-      : myColor ?? "RED";
-    return SCORE_BAR_GRADIENT[c];
-  }, [isSoloMode, myColor, activePlayerIndex, players]);
 
   const localPlayerDisplayName = useMemo(() => {
     if (!room) return null;
@@ -588,22 +351,6 @@ export const GameScreen = ({
       }
     };
   }, []);
-
-  // Clear predicted grid colors that have been confirmed by server
-  useEffect(() => {
-    if (predictedGridColors.size === 0) return;
-    setPredictedGridColors(prev => {
-      const remaining = new Map<string, PlayerColor | "clear">();
-      for (const [key, value] of prev) {
-        if (value === "clear") {
-          if (gridColors.has(key)) remaining.set(key, value); // server hasn't confirmed clear yet
-        } else {
-          if (gridColors.get(key) !== value) remaining.set(key, value); // server hasn't confirmed paint yet
-        }
-      }
-      return remaining.size !== prev.size ? remaining : prev;
-    });
-  }, [gridColors]);
 
   // Listen for room messages
   useEffect(() => {
@@ -651,10 +398,6 @@ export const GameScreen = ({
     if (effectiveStage !== prevStageRef.current) {
       prevStageRef.current = effectiveStage;
       setRippleTrigger(prev => prev + 1);
-      // Bloom pulse on score bar — fades out over 1.5s via CSS transition
-      const bloomStrength = 0.3 + (effectiveStage / 8) * 0.7; // 0.3 → 1.0
-      setBarBloom(bloomStrength);
-      setTimeout(() => setBarBloom(0), 100); // trigger fade-out after paint
       // Flash noise overlay — stage 1 very subtle, ramps up gradually
       const stageIntensity = 0.07 + (effectiveStage / 8) * 0.33; // 0.07 → 0.4
       const stageDuration = 0.6 + (effectiveStage / 8) * 0.8;   // 0.6s → 1.4s
@@ -816,129 +559,6 @@ export const GameScreen = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [room, myColor, isSoloMode, activePlayerIndex, players, gridWidth, gridHeight, predictedPos, isDevMode, isSpectator, countdown, isGameOver]);
 
-  // Transform Grid Colors to Node States
-  const nodeStates = useMemo(() => {
-    const MAX_GRID = 26;
-    const center = Math.floor(MAX_GRID / 2);
-    const halfWidth = Math.floor(gridWidth / 2);
-    const halfHeight = Math.floor(gridHeight / 2);
-    const minX = center - halfWidth;
-    const minY = center - halfHeight;
-
-    const states = Array(gridWidth).fill(null).map(() => Array(gridHeight).fill(null));
-    gridColors.forEach((color, key) => {
-      const [absX, absY] = key.split(",").map(Number);
-      const x = absX - minX;
-      const y = absY - minY;
-      if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight) {
-        states[x][y] = COLOR_MAP_LOWER[color];
-      }
-    });
-    // Apply client-side predictions on top of server state
-    predictedGridColors.forEach((value, key) => {
-      const [absX, absY] = key.split(",").map(Number);
-      const x = absX - minX;
-      const y = absY - minY;
-      if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight) {
-        states[x][y] = value === "clear" ? null : COLOR_MAP_LOWER[value];
-      }
-    });
-    return states;
-  }, [gridColors, predictedGridColors, gridWidth, gridHeight]);
-
-  // Detect score changes and trigger floating score animations (sig avoids work every Colyseus tick).
-  useEffect(() => {
-    const list = collectiblesRef.current;
-    const newFloatingScores: typeof floatingScores = [];
-
-    // Helper to calculate visual position
-    const calculateVisualPos = (absX: number, absY: number, height: number = 0) => {
-      const MAX_GRID = 26;
-      const center = Math.floor(MAX_GRID / 2);
-      const halfWidth = Math.floor(gridWidth / 2);
-      const halfHeight = Math.floor(gridHeight / 2);
-      const minX = center - halfWidth;
-      const minY = center - halfHeight;
-
-      const x = absX - minX;
-      const y = absY - minY;
-
-      const offsetX = (gridWidth - 1) / 2;
-      const offsetY = (gridHeight - 1) / 2;
-      return [
-        (x - offsetX) * SPACING,
-        height,
-        (y - offsetY) * SPACING
-      ] as [number, number, number];
-    };
-
-    list.forEach((collectible) => {
-      const prevScore = prevScoresRef.current.get(collectible.id) || 0;
-      const currentScore = collectible.score || 0;
-
-      // Trigger animation when score changes
-      if (currentScore !== prevScore) {
-        const scoreDiff = currentScore - prevScore;
-        const pos = calculateVisualPos(collectible.x, collectible.y, -2.0);
-
-        const ts = Date.now();
-        newFloatingScores.push({
-          id: `${collectible.id}-${ts}-${crypto.randomUUID()}`,
-          collectibleId: collectible.id,
-          position: [pos[0] + 0.5, pos[1], pos[2] - 0.5], // Top-right offset (right and back)
-          score: scoreDiff,
-          timestamp: ts,
-        });
-
-        prevScoresRef.current.set(collectible.id, currentScore);
-      }
-    });
-
-    if (newFloatingScores.length > 0) {
-      const MAX_FLOATING = 14;
-      setFloatingScores((prev) =>
-        [...prev, ...newFloatingScores].slice(-MAX_FLOATING),
-      );
-
-    }
-  }, [collectiblesScoreSig, gridWidth, gridHeight, myColor]);
-
-  // Play gold sound when a collectible becomes gold
-  const prevGoldRef = useRef<Map<string, boolean>>(new Map());
-  useEffect(() => {
-    collectibles.forEach((c) => {
-      const wasGold = prevGoldRef.current.get(c.id) ?? false;
-      if (!wasGold && c.isGold) {
-        playSound("gold");
-      }
-      prevGoldRef.current.set(c.id, c.isGold);
-    });
-  }, [collectibles]);
-
-  // Detect total score changes for main score bar animation
-  useEffect(() => {
-    const prevScore = prevTotalScoreRef.current;
-    const currentScore = totalScore;
-
-    if (currentScore !== prevScore) {
-      const scoreDiff = currentScore - prevScore;
-      playSound(scoreDiff > 0 ? "activate" : "deactivate");
-      setMainScoreFloating({
-        score: scoreDiff,
-        id: `main-score-${Date.now()}-${crypto.randomUUID()}`,
-      });
-
-      // Particle bursts now fire from collectible score effect (at board positions)
-
-      const clearId = window.setTimeout(() => {
-        setMainScoreFloating(null);
-      }, 2000);
-
-      prevTotalScoreRef.current = currentScore;
-      return () => window.clearTimeout(clearId);
-    }
-  }, [totalScore, myColor]);
-
   // Coordinate Helper
   const getVisualPos = (absX: number, absY: number, height: number = 0) => {
     const MAX_GRID = 26;
@@ -960,16 +580,6 @@ export const GameScreen = ({
     ] as [number, number, number];
   };
 
-  const getDisplayColor = (collectibleColor: string) => {
-    if (collectibleColor === "NEUTRAL") return "#ffffff";
-    if (collectibleColor === "RED" || collectibleColor === "GREEN" || collectibleColor === "BLUE") {
-      return getPlayerHex(collectibleColor);
-    }
-    const colorLower = COLOR_MAP_LOWER[collectibleColor as PlayerColor];
-    if (!colorLower) return getPlayerHex("GREEN");
-    return getPlayerHex(colorLower.toUpperCase() as PlayerColor);
-  };
-
   return (
     <div className="isolate w-full h-screen relative overflow-hidden bg-canvas">
       {/* Cloud nebula backdrop is rendered inside the R3F Canvas (NebulaBackdrop). */}
@@ -984,53 +594,6 @@ export const GameScreen = ({
       {/* NOTE: PolarAmbientParticlesCanvas & NoiseBlobFieldCanvas removed —
            hidden behind opaque R3F Canvas (z-[1]), wasted WebGL contexts.
            NoiseFieldOverlay + ScoreBurstOverlay moved AFTER the R3F Canvas below. */}
-      <style>{`
-        @keyframes scoreGainPop {
-          0% {
-            transform: translateY(14px) scale(0.45) rotate(-8deg);
-            opacity: 0;
-          }
-          12% {
-            transform: translateY(-6px) scale(1.14) rotate(4deg);
-            opacity: 1;
-          }
-          30% {
-            transform: translateY(-3px) scale(1.02) rotate(-1deg);
-          }
-          52% {
-            transform: translateY(-5px) scale(1) rotate(0deg);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(-84px) scale(0.86) rotate(0deg);
-            opacity: 0;
-          }
-        }
-        @keyframes scoreLossPop {
-          0% {
-            transform: translateY(0) scale(1);
-            opacity: 1;
-          }
-          22% {
-            transform: translateY(4px) scale(1.12) rotate(-4deg);
-          }
-          100% {
-            transform: translateY(56px) scale(0.75) rotate(6deg);
-            opacity: 0;
-          }
-        }
-        @keyframes scoreBurstRing {
-          0% {
-            transform: translate(-50%, -50%) scale(0.35);
-            opacity: 0.65;
-          }
-          100% {
-            transform: translate(-50%, -50%) scale(2.4);
-            opacity: 0;
-          }
-        }
-      `}</style>
-
       {/* HUD: frosted polar chrome (match timer / stage chips); settings swap into same shell */}
       <div className="absolute left-4 top-4 z-20 flex w-[min(11.5rem,calc(100vw-2rem))] flex-col gap-2">
         <div
@@ -1277,15 +840,13 @@ export const GameScreen = ({
 
       {/* Stage Display - Top Center (polar blue chrome) */}
       <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2">
-        {/* Outer glow — intensity scales with stage + bloom pulse on transition */}
+        {/* Outer glow — intensity scales with stage */}
         <div
           className="absolute -inset-3 rounded-sm"
           style={{
-            background: barBloom > 0
-              ? `radial-gradient(ellipse at center, rgba(56,189,248,${0.15 + barBloom * 0.3}) 0%, rgba(186,230,253,${barBloom * 0.1}) 50%, transparent 75%)`
-              : `radial-gradient(ellipse at center, rgba(56,189,248,${0.06 + (effectiveStage / 8) * 0.18}) 0%, transparent 70%)`,
-            filter: `blur(${barBloom > 0 ? 10 + barBloom * 8 : 6 + effectiveStage * 1.5}px)`,
-            transition: barBloom > 0 ? "none" : "all 1.5s ease-out",
+            background: `radial-gradient(ellipse at center, rgba(56,189,248,${0.06 + (effectiveStage / 8) * 0.18}) 0%, transparent 70%)`,
+            filter: `blur(${6 + effectiveStage * 1.5}px)`,
+            transition: "all 1.5s ease-out",
           }}
           aria-hidden
         />
@@ -1310,205 +871,6 @@ export const GameScreen = ({
         </div>
       </div>
 
-      {/* Right side: stage target, vertical meter, high score marker, current below bar */}
-      <div className="absolute right-4 top-1/2 z-10 max-h-[calc(100vh-2rem)] -translate-y-1/2 sm:right-6">
-        <aside
-          className="flex w-auto max-w-[min(18rem,calc(100vw-2rem))] flex-col items-end"
-          aria-label="Stage target and scores"
-          data-ui="game-score-panel"
-        >
-          <div className="relative pl-[5.5rem] sm:pl-[5.75rem]">
-            <div
-              className="relative ml-auto rounded-none border border-solid bg-canvas/50 py-2.5 pl-1.5 pr-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px]"
-              style={{ borderColor: POLAR_HUD.border }}
-              data-ui="game-score-panel-frame"
-            >
-              <HudCornerLs />
-              <div className="relative z-[1] ml-auto w-14">
-              <div
-                className="mb-2 w-14 border-b border-white/10 pb-2 text-center"
-                role="group"
-                aria-label={`Stage target ${currentStageThreshold.toFixed(0)}`}
-              >
-                <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">
-                  Stage
-                </p>
-                <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">
-                  Target
-                </p>
-                <p className="font-montreal text-lg font-bold leading-tight text-white">
-                  {currentStageThreshold.toFixed(0)}
-                </p>
-              </div>
-
-              {/* Floating score change — snap-in, ring burst on gains, drift + fade out */}
-              {mainScoreFloating && (
-                <div
-                  key={mainScoreFloating.id}
-                  className="pointer-events-none absolute -top-20 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center"
-                >
-                  {mainScoreFloating.score > 0 && (
-                    <span
-                      className="pointer-events-none absolute left-1/2 top-1/2 h-14 w-14 rounded-none border-2 border-white/50 bg-white/15"
-                      style={{
-                        animation: "scoreBurstRing 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards",
-                      }}
-                      aria-hidden
-                    />
-                  )}
-                  <div
-                    className="relative whitespace-nowrap font-montreal text-5xl font-extrabold tracking-tight will-change-[transform,opacity] sm:text-6xl"
-                    style={{
-                      animation: `${mainScoreFloating.score > 0 ? "scoreGainPop" : "scoreLossPop"} 1.75s cubic-bezier(0.25, 0.9, 0.35, 1) forwards`,
-                      color: mainScoreFloating.score > 0 ? "#f8fafc" : "#fca5a5",
-                    }}
-                  >
-                    {mainScoreFloating.score > 0 ? "+" : ""}
-                    {mainScoreFloating.score}
-                  </div>
-                </div>
-              )}
-
-              {/* Bar shell: overflow-visible wrapper so high score (right-full) is not clipped */}
-              <div className="relative flex w-14 justify-center">
-                <div className="relative h-[min(22rem,50vh)] w-14 shrink-0 overflow-visible sm:h-[min(24rem,52vh)]">
-                  {/* Bloom pulse — flashes on stage change, fades out */}
-                  <div
-                    className="pointer-events-none absolute -inset-3 z-[-1]"
-                    style={{
-                      background: `radial-gradient(ellipse at center, rgba(255,255,255,${barBloom * 0.35}) 0%, rgba(255,255,255,${barBloom * 0.12}) 40%, transparent 70%)`,
-                      filter: `blur(${12 + barBloom * 8}px)`,
-                      opacity: barBloom > 0 ? 1 : 0,
-                      transition: barBloom > 0 ? "none" : "opacity 1.5s ease-out",
-                    }}
-                    aria-hidden
-                  />
-                  <div
-                    className="absolute inset-0 overflow-hidden rounded-none border border-solid bg-white/[0.04] ring-1 ring-inset ring-white/[0.05] backdrop-blur-[4px]"
-                    style={{
-                      borderColor: barBloom > 0
-                        ? `rgba(255,255,255,${0.25 + barBloom * 0.3})`
-                        : POLAR_HUD.barBorder,
-                      boxShadow: barBloom > 0
-                        ? `inset 0 0 20px ${POLAR_HUD.barInset}, 0 0 ${16 + barBloom * 12}px rgba(255,255,255,${barBloom * 0.2})`
-                        : `inset 0 0 20px ${POLAR_HUD.barInset}`,
-                      transition: barBloom > 0 ? "none" : "border-color 1.5s ease-out, box-shadow 1.5s ease-out",
-                    }}
-                  >
-                    {/* Subtle vertical scanline texture */}
-                    <div
-                      className="absolute inset-0 opacity-[0.03]"
-                      style={{
-                        backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.5) 2px, rgba(255,255,255,0.5) 3px)",
-                      }}
-                      aria-hidden
-                    />
-                    <div className="absolute inset-0 overflow-hidden rounded-none">
-                      <div
-                        className="absolute bottom-0 left-0 right-0 overflow-hidden transition-[height] duration-500 ease-out"
-                        style={{
-                          height: `${scoreBarFillPercent}%`,
-                        }}
-                      >
-                        <div
-                          className="absolute inset-0"
-                          style={{
-                            background: scoreBarGradient,
-                          }}
-                        />
-                        {/* Inner shimmer highlight */}
-                        <div
-                          className="absolute inset-y-0 left-0 w-[40%] opacity-30"
-                          style={{
-                            background: "linear-gradient(to right, rgba(255,255,255,0.15), transparent)",
-                          }}
-                          aria-hidden
-                        />
-                        {/* Bright edge line at fill top (inside overflow) */}
-                        <div
-                          className="absolute left-0 right-0 top-0 h-3"
-                          style={{
-                            background: "linear-gradient(to bottom, rgba(255,255,255,0.6), rgba(255,255,255,0.15) 40%, transparent)",
-                          }}
-                          aria-hidden
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Soft glow halo at fill top edge — OUTSIDE overflow:hidden */}
-                  <div
-                    className="pointer-events-none absolute left-0 right-0 z-[2] h-0 transition-[bottom] duration-500 ease-out"
-                    style={{ bottom: `${scoreBarFillPercent}%` }}
-                    aria-hidden
-                  >
-                    <div
-                      className="absolute -left-2 -right-2 -top-4 h-8"
-                      style={{
-                        background: "radial-gradient(ellipse 120% 100% at 50% 50%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 40%, transparent 70%)",
-                        filter: "blur(4px)",
-                      }}
-                    />
-                  </div>
-
-                  {/* Zero-height anchor at high-score % so -translate-y-1/2 centers on the fill top (not the box middle). */}
-                  <div
-                    className="absolute right-full top-auto z-10 h-0 w-[5.5rem] overflow-visible transition-[bottom] duration-500 ease-out sm:w-[5.75rem]"
-                    style={{ bottom: `${highScoreBarPercent}%` }}
-                  >
-                    <div className="flex w-full -translate-y-1/2 items-center justify-end gap-0 pr-2 sm:pr-2.5">
-                      <div
-                        className="min-w-0 text-right"
-                        role="group"
-                        aria-label={`High score ${highScore.toFixed(0)}`}
-                      >
-                        <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">
-                          High score
-                        </p>
-                        <p className="font-montreal text-lg font-bold tabular-nums leading-tight text-white">
-                          {highScore.toFixed(0)}
-                        </p>
-                      </div>
-                      <div
-                        className="ml-1.5 flex w-10 shrink-0 items-center sm:ml-2 sm:w-12"
-                        aria-hidden
-                      >
-                        <div
-                          className="h-[2px] min-w-0 flex-1"
-                          style={{
-                            background: `linear-gradient(to right, ${POLAR_HUD.connectorFrom}, ${POLAR_HUD.connectorVia}, ${POLAR_HUD.connectorTo})`,
-                          }}
-                        />
-                        <div
-                          className="size-1.5 shrink-0 border border-solid"
-                          style={{
-                            backgroundColor: POLAR_HUD.marker,
-                            borderColor: POLAR_HUD.markerRing,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                className="mt-2 w-14 border-t border-white/10 pt-2 text-center"
-                role="group"
-                aria-label={`Current score ${totalScore.toFixed(0)}`}
-              >
-                <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">
-                  Current
-                </p>
-                <p className="font-montreal text-lg font-bold tabular-nums leading-tight text-white">
-                  {totalScore.toFixed(0)}
-                </p>
-              </div>
-            </div>
-            </div>
-          </div>
-        </aside>
-      </div>
 
       {/* Timer Display - Bottom Center (polar blue chrome) */}
       <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
@@ -1544,7 +906,6 @@ export const GameScreen = ({
           <button
             onClick={() => {
               if (room) {
-                console.log(`[Dev Mode] Score at stage up: ${totalScore} (RED: ${scores.RED}, GREEN: ${scores.GREEN}, BLUE: ${scores.BLUE}) | Stage: ${stage}`);
                 room.send("devStageUp", {});
               }
             }}
@@ -1596,101 +957,7 @@ export const GameScreen = ({
         <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
         <pointLight position={[-10, -10, -10]} intensity={0.5} color={getFloorTint("GREEN")} />
 
-        <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} nodeStates={nodeStates} rippleTrigger={rippleTrigger} />
-            <ConnectionLines key={`lines-${gridWidth}-${gridHeight}`} nodeStates={nodeStates} gridWidth={gridWidth} gridHeight={gridHeight} />
-
-            {/* Collectibles */}
-            {collectibles.map((collectible) => {
-              const pos = getVisualPos(collectible.x, collectible.y, -2.0);
-              const displayColor = getDisplayColor(collectible.color);
-
-              if (collectible.type === "network") {
-                return (
-                  <group key={collectible.id} position={pos}>
-                    <GoldAura isGold={collectible.isGold} color={displayColor}>
-                      <SpinningLambda color={displayColor} connected={collectible.isActivated} />
-                    </GoldAura>
-                  </group>
-                );
-              } else if (collectible.type === "box") {
-                return (
-                  <group key={collectible.id} position={pos}>
-                    <GoldAura isGold={collectible.isGold} color={displayColor}>
-                      <group rotation={[0, Math.PI / 8, 0]}>
-                        <CubeFrame color={displayColor} scale={0.75} connected={collectible.isActivated} />
-                      </group>
-                    </GoldAura>
-                  </group>
-                );
-              } else if (collectible.type === "equilibrium") {
-                return (
-                  <group key={collectible.id} position={pos}>
-                    <GoldAura isGold={collectible.isGold} color={displayColor}>
-                      <group rotation={[Math.PI / 2, 0, 0]}>
-                        <EquilateralTriangle color={displayColor} scale={1.0} connected={collectible.isActivated} />
-                      </group>
-                    </GoldAura>
-                  </group>
-                );
-              } else if (collectible.type === "clone") {
-                const rotationY = Math.PI + (collectible.orientation * Math.PI) / 180;
-                const flipScale = collectible.isFlipped ? -1 : 1;
-                return (
-                  <group key={collectible.id} position={pos}>
-                    <GoldAura isGold={collectible.isGold} color={displayColor}>
-                      <group rotation={[0, rotationY, 0]} scale={[flipScale, 1, 1]}>
-                        <Hand color={displayColor} scale={0.6} connected={collectible.isActivated} />
-                      </group>
-                    </GoldAura>
-                  </group>
-                );
-              } else if (collectible.type === "vantage") {
-                return (
-                  <group key={collectible.id} position={pos}>
-                    <GoldAura isGold={collectible.isGold} color={displayColor}>
-                      <group rotation={[Math.PI / 2, 0, 0]} scale={0.5}>
-                        <Compass color={displayColor} scale={1.0} connected={collectible.isActivated} />
-                      </group>
-                    </GoldAura>
-                  </group>
-                );
-              } else if (collectible.type === "galaxy") {
-                return (
-                  <group key={collectible.id} position={pos}>
-                    <GoldAura isGold={collectible.isGold} color={displayColor}>
-                      <group rotation={[Math.PI / 2, 0, 0]}>
-                        <GalaxyModel color={displayColor} scale={0.72} connected={collectible.isActivated} />
-                      </group>
-                    </GoldAura>
-                  </group>
-                );
-              } else if (collectible.type === "polyomino") {
-                return (
-                  <group key={collectible.id} position={pos}>
-                    <GoldAura isGold={collectible.isGold} color={displayColor}>
-                      <Polyomino color={displayColor} playerColor={collectible.color} scale={1.0} connected={collectible.isActivated} />
-                    </GoldAura>
-                  </group>
-                );
-              }
-
-
-
-              return null;
-            })}
-
-            {/* Floating Score Animations */}
-            {floatingScores.map((fs) => (
-              <FloatingScore
-                key={fs.id}
-                position={fs.position}
-                score={fs.score}
-                timestamp={fs.timestamp}
-                onComplete={() => {
-                  setFloatingScores(prev => prev.filter(s => s.id !== fs.id));
-                }}
-              />
-            ))}
+        <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
 
             {/* Players */}
             {Array.from(players.values()).map((player, index) => {
@@ -1737,30 +1004,6 @@ export const GameScreen = ({
                 onPing={(x, y) => {
                   if (room) {
                     room.send("ping", { x, y });
-                  }
-                }}
-                onDevNodeClick={(gridX, gridY) => {
-                  // Determine the active player's color (same logic as movement)
-                  const playerArray = Array.from(players.values());
-                  const currentPlayer = isSoloMode
-                    ? playerArray[activePlayerIndex]
-                    : playerArray.find(p => p.color === myColor);
-
-                  const activeColor = currentPlayer?.color;
-
-                  if (room && activeColor) {
-                    // Client-side prediction: show color immediately
-                    const key = `${gridX},${gridY}`;
-                    setPredictedGridColors(prev => new Map(prev).set(key, activeColor));
-                    room.send("devPaintNode", { x: gridX, y: gridY, color: activeColor });
-                  }
-                }}
-                onDevNodeRightClick={(gridX, gridY) => {
-                  if (room) {
-                    // Client-side prediction: clear color immediately
-                    const key = `${gridX},${gridY}`;
-                    setPredictedGridColors(prev => new Map(prev).set(key, "clear"));
-                    room.send("devClearNode", { x: gridX, y: gridY });
                   }
                 }}
               />

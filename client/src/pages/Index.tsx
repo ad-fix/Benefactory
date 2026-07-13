@@ -21,10 +21,6 @@ function buildReturnUrl(returnUrl: string, params: Record<string, string | numbe
 
 // Types
 type PlayerColor = "RED" | "GREEN" | "BLUE";
-type CollectibleType = "network" | "box" | "equilibrium" | "clone" | "vantage";
-
-type CollectibleOrientation = 0 | 90 | 180 | 270;
-type CollectibleColor = PlayerColor | "NEUTRAL";
 
 interface PlayerState {
   x: number;
@@ -36,34 +32,15 @@ interface PlayerState {
   discordName: string;
 }
 
-interface Collectible {
-  x: number;
-  y: number;
-  color: CollectibleColor;
-  id: string;
-  type: CollectibleType;
-  isActivated: boolean;
-  isGold: boolean;
-  orientation: CollectibleOrientation;
-  isFlipped: boolean;
-  score: number;
-}
-
 interface ServerGameState {
   players: Map<string, PlayerState>;
-  gridColors: Map<string, { color: PlayerColor }>;
-  scores: Map<string, number>;
   gridWidth: number;
   gridHeight: number;
-  totalScore: number;
-  highScore: number;
   gameStarted: boolean;
   countdown: number;
   isGameOver: boolean;
   timeRemaining: number;
-  collectibles: Map<string, Collectible>;
   stage: number;
-  stageThresholds: number[];
   seed: number;
 }
 
@@ -72,14 +49,8 @@ interface GameStateLocal {
   gridWidth: number;
   gridHeight: number;
   players: Map<string, PlayerState>;
-  gridColors: Map<string, PlayerColor>;
-  collectibles: Collectible[];
-  scores: Record<PlayerColor, number>;
-  totalScore: number;
-  highScore: number;
   gameStarted: boolean;
   stage: number;
-  stageThresholds: number[];
   timeRemaining: number;
   countdown: number;
   isGameOver: boolean;
@@ -92,14 +63,8 @@ const initialGameState: GameStateLocal = {
   gridWidth: 10,
   gridHeight: 8,
   players: new Map(),
-  gridColors: new Map(),
-  collectibles: [],
-  scores: { RED: 0, GREEN: 0, BLUE: 0 },
-  totalScore: 0,
-  highScore: 0,
   gameStarted: false,
   stage: 1,
-  stageThresholds: [],
   timeRemaining: 30 * 60,
   countdown: 0,
   isGameOver: false,
@@ -209,44 +174,15 @@ const Index = () => {
       if (id === gameRoom.sessionId && !myColor) setMyColor(p.color);
     });
 
-    const newGridColors = new Map<string, PlayerColor>();
-    gameRoom.state.gridColors?.forEach((c, k) => { if (c.color) newGridColors.set(k, c.color); });
-
-    const newCollectibles: Collectible[] = [];
-    gameRoom.state.collectibles?.forEach((collectible) => {
-      newCollectibles.push({
-        x: collectible.x,
-        y: collectible.y,
-        color: collectible.color,
-        id: collectible.id,
-        type: collectible.type,
-        isActivated: collectible.isActivated,
-        isGold: collectible.isGold,
-        orientation: collectible.orientation as CollectibleOrientation,
-        isFlipped: collectible.isFlipped,
-        score: collectible.score || 0,
-      });
-    });
-
     dispatch({
       type: "SYNC_STATE",
       payload: {
         gridWidth: gameRoom.state.gridWidth || 10,
         gridHeight: gameRoom.state.gridHeight || 8,
-        totalScore: gameRoom.state.totalScore || 0,
         gameStarted: gameRoom.state.gameStarted || false,
         stage: gameRoom.state.stage || 1,
-        stageThresholds: Array.from(gameRoom.state.stageThresholds || []),
         seed: gameRoom.state.seed || 0,
         players: newPlayers,
-        gridColors: newGridColors,
-        collectibles: newCollectibles,
-        scores: {
-          RED: gameRoom.state.scores?.get("RED") || 0,
-          GREEN: gameRoom.state.scores?.get("GREEN") || 0,
-          BLUE: gameRoom.state.scores?.get("BLUE") || 0,
-        },
-        highScore: gameRoom.state.highScore || 0,
         countdown: gameRoom.state.countdown ?? 0,
         isGameOver: gameRoom.state.isGameOver || false,
         timeRemaining: gameRoom.state.timeRemaining ?? 30 * 60,
@@ -521,17 +457,11 @@ const Index = () => {
       <GameScreen
         room={room}
         players={gameState.players}
-        gridColors={gameState.gridColors}
-        collectibles={gameState.collectibles}
         gridWidth={gameState.gridWidth}
         gridHeight={gameState.gridHeight}
         myColor={myColor}
         isSoloMode={initPayload?.soloMode || false}
-        scores={gameState.scores}
-        totalScore={gameState.totalScore}
-        highScore={gameState.highScore}
         stage={gameState.stage}
-        stageThresholds={gameState.stageThresholds}
         timeRemaining={gameState.timeRemaining}
         isDevMode={initPayload?.devMode || false}
         isSpectator={isSpectator}
@@ -670,10 +600,7 @@ const Index = () => {
       )}
       {showResults && (
         <ResultsOverlay
-          totalScore={gameState.totalScore}
-          highScore={gameState.highScore}
           stage={gameState.stage}
-          scores={gameState.scores}
           soloMode={initPayload?.soloMode || false}
           reason="gameover"
           returnUrl={returnUrl}

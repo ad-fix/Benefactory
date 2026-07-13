@@ -14,10 +14,7 @@ interface PlayerInfo {
 }
 
 export interface ResultsOverlayProps {
-  totalScore: number;
-  highScore: number;
   stage: number;
-  scores: Record<PlayerColor, number>;
   soloMode: boolean;
   reason: "gameover" | "abandoned";
   returnUrl?: string | null;
@@ -28,10 +25,7 @@ export interface ResultsOverlayProps {
 const labelCls = "text-left font-montreal text-[9px] font-medium uppercase tracking-[0.12em] text-slate-300";
 
 export const ResultsOverlay = ({
-  totalScore,
-  highScore,
   stage,
-  scores,
   soloMode,
   reason,
   returnUrl,
@@ -44,8 +38,6 @@ export const ResultsOverlay = ({
     const t = setTimeout(() => setVisible(true), 300);
     return () => clearTimeout(t);
   }, []);
-
-  const formatScore = (n: number) => n.toLocaleString();
 
   return (
     <div
@@ -79,43 +71,29 @@ export const ResultsOverlay = ({
           </header>
 
           <div className="overflow-hidden rounded-none border border-solid ring-1 ring-inset ring-white/[0.04]" style={{ borderColor: POLAR_HUD.border, background: "rgba(255,255,255,0.03)" }}>
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 px-3.5 py-2.5 sm:px-4 sm:py-3">
-              <span className={labelCls}>Score</span>
-              <span className="font-montreal text-lg font-bold text-white sm:text-xl">
-                {formatScore(totalScore)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 px-3.5 py-2.5 sm:px-4 sm:py-3">
+            <div className="flex items-center justify-between gap-4 px-3.5 py-2.5 sm:px-4 sm:py-3">
               <span className={labelCls}>Stage</span>
               <span className="font-montreal text-lg font-bold text-white sm:text-xl">{stage}</span>
             </div>
-            <div className="flex items-center justify-between gap-4 px-3.5 py-2.5 sm:px-4 sm:py-3">
-              <span className={labelCls}>High score</span>
-              <span className="font-montreal text-lg font-bold text-white sm:text-xl">
-                {formatScore(highScore)}
-              </span>
-            </div>
 
-            {!soloMode && (
+            {!soloMode && players.length > 0 && (
               <div className="border-t border-white/10">
                 {(["RED", "GREEN", "BLUE"] as const).map((color) => {
                   const player = players.find((p) => p.color === color);
+                  if (!player) return null;
                   return (
                     <div
                       key={color}
-                      className="flex items-center justify-between gap-4 border-b border-white/[0.06] px-3.5 py-2 sm:px-4 last:border-b-0"
+                      className="flex items-center gap-3 border-b border-white/[0.06] px-3.5 py-2 sm:px-4 last:border-b-0"
                     >
                       <div className="flex flex-col gap-0.5">
                         <span className={cn("font-montreal text-sm font-semibold", getPlayerTailwindTextClass(color))}>
-                          {player?.name || color}
+                          {player.name || color}
                         </span>
-                        {player?.school && (
+                        {player.school && (
                           <span className="text-xs text-slate-500">{player.school}</span>
                         )}
                       </div>
-                      <span className="font-montreal text-sm font-semibold text-white">
-                        {formatScore(scores[color])}
-                      </span>
                     </div>
                   );
                 })}
