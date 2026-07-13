@@ -50,6 +50,7 @@ const MainMenu = () => {
       userId: crypto.randomUUID(),
       playerName: name,
       isAdmin: false,
+      devMode: import.meta.env.DEV,
       soloMode,
       roomId,
     };
