@@ -382,7 +382,6 @@ interface GameScreenProps {
   countdown?: number;
   bgMusicVolume?: number;
   onBgMusicVolumeChange?: (volume: number) => void;
-  onGameAbandoned?: () => void;
   challengeName?: string;
 }
 
@@ -484,7 +483,6 @@ export const GameScreen = ({
   countdown = 0,
   bgMusicVolume,
   onBgMusicVolumeChange,
-  onGameAbandoned,
   challengeName,
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
@@ -492,26 +490,6 @@ export const GameScreen = ({
   const [settingsExiting, setSettingsExiting] = useState(false);
   const [activePlayerIndex, setActivePlayerIndex] = useState(0);
   const [pings, setPings] = useState<Ping[]>([]);
-  const [clearBoardVoteActive, setClearBoardVoteActive] = useState(false);
-  const [clearBoardVoteCount, setClearBoardVoteCount] = useState(0);
-  const [clearBoardExpiresAt, setClearBoardExpiresAt] = useState<number | null>(null);
-  const [clearBoardInitiatorColor, setClearBoardInitiatorColor] = useState<PlayerColor | null>(null);
-  const [clearBoardSecondsLeft, setClearBoardSecondsLeft] = useState(0);
-  const [clearBoardBannerVisible, setClearBoardBannerVisible] = useState(false);
-  const clearBoardBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [clearBoardExpiredVisible, setClearBoardExpiredVisible] = useState(false);
-  const clearBoardExpiredTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [hasVotedClearBoard, setHasVotedClearBoard] = useState(false);
-  const [abandonVoteActive, setAbandonVoteActive] = useState(false);
-  const [abandonVoteCount, setAbandonVoteCount] = useState(0);
-  const [abandonExpiresAt, setAbandonExpiresAt] = useState<number | null>(null);
-  const [abandonInitiatorColor, setAbandonInitiatorColor] = useState<PlayerColor | null>(null);
-  const [abandonSecondsLeft, setAbandonSecondsLeft] = useState(0);
-  const [abandonBannerVisible, setAbandonBannerVisible] = useState(false);
-  const abandonBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [abandonExpiredVisible, setAbandonExpiredVisible] = useState(false);
-  const abandonExpiredTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [hasVotedAbandon, setHasVotedAbandon] = useState(false);
   const [rippleTrigger, setRippleTrigger] = useState(0);
   const [barBloom, setBarBloom] = useState(0); // 0 = off, >0 = intensity
   const [controlsOpen, setControlsOpen] = useState(false);
@@ -543,9 +521,6 @@ export const GameScreen = ({
   const seqCounterRef = useRef(0);
   const lastRepeatTimeRef = useRef(0);
   const prevStageRef = useRef(stage);
-  const onGameAbandonedRef = useRef(onGameAbandoned);
-  onGameAbandonedRef.current = onGameAbandoned;
-
   // Floating score animations
   const [floatingScores, setFloatingScores] = useState<Array<{
     id: string;
@@ -605,24 +580,6 @@ export const GameScreen = ({
     return n && n.length > 0 ? n : null;
   }, [room, players]);
 
-  const clearBoardInitiatorName = useMemo(() => {
-    if (!clearBoardInitiatorColor) return null;
-    const initiator = Array.from(players.values()).find((p) => p.color === clearBoardInitiatorColor);
-    const trimmed = initiator?.name?.trim();
-    return trimmed && trimmed.length > 0
-      ? trimmed
-      : getPlayerDisplayLabel(clearBoardInitiatorColor);
-  }, [clearBoardInitiatorColor, players]);
-
-  const abandonInitiatorName = useMemo(() => {
-    if (!abandonInitiatorColor) return null;
-    const initiator = Array.from(players.values()).find((p) => p.color === abandonInitiatorColor);
-    const trimmed = initiator?.name?.trim();
-    return trimmed && trimmed.length > 0
-      ? trimmed
-      : getPlayerDisplayLabel(abandonInitiatorColor);
-  }, [abandonInitiatorColor, players]);
-
   useEffect(() => {
     return () => {
       if (settingsCloseTimerRef.current != null) {
@@ -665,100 +622,6 @@ export const GameScreen = ({
       setPings((prev) => [...prev, newPing]);
     };
 
-    const handleClearBoardVoteStarted = (message: { initiatorColor: PlayerColor; expiresAt: number }) => {
-      setClearBoardVoteActive(true);
-      setClearBoardExpiresAt(message.expiresAt);
-      setClearBoardVoteCount(1);
-      setClearBoardInitiatorColor(message.initiatorColor);
-      setClearBoardExpiredVisible(false);
-      if (clearBoardExpiredTimerRef.current) {
-        clearTimeout(clearBoardExpiredTimerRef.current);
-        clearBoardExpiredTimerRef.current = null;
-      }
-      setClearBoardBannerVisible(true);
-      if (clearBoardBannerTimerRef.current) clearTimeout(clearBoardBannerTimerRef.current);
-      clearBoardBannerTimerRef.current = setTimeout(() => {
-        setClearBoardBannerVisible(false);
-        clearBoardBannerTimerRef.current = null;
-      }, 2200);
-    };
-
-    const handleClearBoardVoteUpdate = (message: { voterColor: PlayerColor; voteCount: number }) => {
-      setClearBoardVoteCount(message.voteCount);
-      playSound("vote");
-    };
-
-    const handleClearBoardVoteExpired = () => {
-      setClearBoardVoteActive(false);
-      setClearBoardExpiresAt(null);
-      setClearBoardVoteCount(0);
-      setClearBoardInitiatorColor(null);
-      setHasVotedClearBoard(false);
-      setClearBoardExpiredVisible(true);
-      if (clearBoardExpiredTimerRef.current) clearTimeout(clearBoardExpiredTimerRef.current);
-      clearBoardExpiredTimerRef.current = setTimeout(() => {
-        setClearBoardExpiredVisible(false);
-        clearBoardExpiredTimerRef.current = null;
-      }, 3000);
-    };
-
-    const handleBoardCleared = () => {
-      setClearBoardVoteActive(false);
-      setClearBoardExpiresAt(null);
-      setClearBoardVoteCount(0);
-      setClearBoardInitiatorColor(null);
-      setHasVotedClearBoard(false);
-      playSound("clear");
-      toast.success("Board cleared!");
-    };
-
-    const handleAbandonVoteStarted = (message: { initiatorColor: string; expiresAt: number }) => {
-      setAbandonVoteActive(true);
-      setAbandonExpiresAt(message.expiresAt);
-      setAbandonVoteCount(1);
-      setAbandonInitiatorColor(message.initiatorColor as PlayerColor);
-      setAbandonExpiredVisible(false);
-      if (abandonExpiredTimerRef.current) {
-        clearTimeout(abandonExpiredTimerRef.current);
-        abandonExpiredTimerRef.current = null;
-      }
-      setAbandonBannerVisible(true);
-      if (abandonBannerTimerRef.current) clearTimeout(abandonBannerTimerRef.current);
-      abandonBannerTimerRef.current = setTimeout(() => {
-        setAbandonBannerVisible(false);
-        abandonBannerTimerRef.current = null;
-      }, 2200);
-    };
-
-    const handleAbandonVoteUpdate = (message: { voterColor: string; voteCount: number }) => {
-      setAbandonVoteCount(message.voteCount);
-      playSound("vote");
-    };
-
-    const handleAbandonVoteExpired = () => {
-      setAbandonVoteActive(false);
-      setAbandonExpiresAt(null);
-      setAbandonVoteCount(0);
-      setAbandonInitiatorColor(null);
-      setHasVotedAbandon(false);
-      setAbandonExpiredVisible(true);
-      if (abandonExpiredTimerRef.current) clearTimeout(abandonExpiredTimerRef.current);
-      abandonExpiredTimerRef.current = setTimeout(() => {
-        setAbandonExpiredVisible(false);
-        abandonExpiredTimerRef.current = null;
-      }, 3000);
-    };
-
-    const handleGameAbandoned = () => {
-      setAbandonVoteActive(false);
-      setAbandonExpiresAt(null);
-      setAbandonVoteCount(0);
-      setAbandonInitiatorColor(null);
-      setHasVotedAbandon(false);
-      playSound("abandon");
-      onGameAbandonedRef.current?.();
-    };
-
     const handleMoveAck = (message: { seq: number; x: number; y: number }) => {
       // Remove this input from pending
       pendingInputsRef.current.delete(message.seq);
@@ -772,27 +635,11 @@ export const GameScreen = ({
 
     const offPing = room.onMessage("ping", handlePing);
     const offMoveAck = room.onMessage("moveAck", handleMoveAck);
-    const offClearStart = room.onMessage("clearBoardVoteStarted", handleClearBoardVoteStarted);
-    const offClearUpdate = room.onMessage("clearBoardVoteUpdate", handleClearBoardVoteUpdate);
-    const offClearExpired = room.onMessage("clearBoardVoteExpired", handleClearBoardVoteExpired);
-    const offBoardCleared = room.onMessage("boardCleared", handleBoardCleared);
-    const offAbandonStart = room.onMessage("abandonGameVoteStarted", handleAbandonVoteStarted);
-    const offAbandonUpdate = room.onMessage("abandonGameVoteUpdate", handleAbandonVoteUpdate);
-    const offAbandonExpired = room.onMessage("abandonGameVoteExpired", handleAbandonVoteExpired);
-    const offGameAbandoned = room.onMessage("gameAbandoned", handleGameAbandoned);
 
     return () => {
       [
         offPing,
         offMoveAck,
-        offClearStart,
-        offClearUpdate,
-        offClearExpired,
-        offBoardCleared,
-        offAbandonStart,
-        offAbandonUpdate,
-        offAbandonExpired,
-        offGameAbandoned,
       ].forEach((off) => {
         if (typeof off === "function") off();
       });
@@ -821,90 +668,6 @@ export const GameScreen = ({
       console.log(`[Dev Mode] Seed: ${seed}`);
     }
   }, [isDevMode, seed]);
-
-  // Handle clear board vote expiration timer + countdown
-  useEffect(() => {
-    if (!clearBoardExpiresAt) {
-      setClearBoardSecondsLeft(0);
-      return;
-    }
-
-    const tick = () => {
-      const remainingMs = clearBoardExpiresAt - Date.now();
-      if (remainingMs <= 0) {
-        setClearBoardVoteActive(false);
-        setClearBoardExpiresAt(null);
-        setClearBoardVoteCount(0);
-        setClearBoardInitiatorColor(null);
-        setHasVotedClearBoard(false);
-        setClearBoardSecondsLeft(0);
-        setClearBoardExpiredVisible(true);
-        if (clearBoardExpiredTimerRef.current) clearTimeout(clearBoardExpiredTimerRef.current);
-        clearBoardExpiredTimerRef.current = setTimeout(() => {
-          setClearBoardExpiredVisible(false);
-          clearBoardExpiredTimerRef.current = null;
-        }, 3000);
-      } else {
-        setClearBoardSecondsLeft(Math.ceil(remainingMs / 1000));
-      }
-    };
-    tick();
-    const interval = setInterval(tick, 200);
-    return () => clearInterval(interval);
-  }, [clearBoardExpiresAt]);
-
-  // Handle abandon vote expiration timer + countdown
-  useEffect(() => {
-    if (!abandonExpiresAt) {
-      setAbandonSecondsLeft(0);
-      return;
-    }
-
-    const tick = () => {
-      const remainingMs = abandonExpiresAt - Date.now();
-      if (remainingMs <= 0) {
-        setAbandonVoteActive(false);
-        setAbandonExpiresAt(null);
-        setAbandonVoteCount(0);
-        setAbandonInitiatorColor(null);
-        setHasVotedAbandon(false);
-        setAbandonSecondsLeft(0);
-        setAbandonExpiredVisible(true);
-        if (abandonExpiredTimerRef.current) clearTimeout(abandonExpiredTimerRef.current);
-        abandonExpiredTimerRef.current = setTimeout(() => {
-          setAbandonExpiredVisible(false);
-          abandonExpiredTimerRef.current = null;
-        }, 3000);
-      } else {
-        setAbandonSecondsLeft(Math.ceil(remainingMs / 1000));
-      }
-    };
-    tick();
-    const interval = setInterval(tick, 200);
-    return () => clearInterval(interval);
-  }, [abandonExpiresAt]);
-
-  // Clean up the banner timers on unmount
-  useEffect(() => {
-    return () => {
-      if (clearBoardBannerTimerRef.current) {
-        clearTimeout(clearBoardBannerTimerRef.current);
-        clearBoardBannerTimerRef.current = null;
-      }
-      if (abandonBannerTimerRef.current) {
-        clearTimeout(abandonBannerTimerRef.current);
-        abandonBannerTimerRef.current = null;
-      }
-      if (clearBoardExpiredTimerRef.current) {
-        clearTimeout(clearBoardExpiredTimerRef.current);
-        clearBoardExpiredTimerRef.current = null;
-      }
-      if (abandonExpiredTimerRef.current) {
-        clearTimeout(abandonExpiredTimerRef.current);
-        abandonExpiredTimerRef.current = null;
-      }
-    };
-  }, []);
 
   // Initialize predicted position when we know our player
   useEffect(() => {
@@ -1222,33 +985,6 @@ export const GameScreen = ({
            hidden behind opaque R3F Canvas (z-[1]), wasted WebGL contexts.
            NoiseFieldOverlay + ScoreBurstOverlay moved AFTER the R3F Canvas below. */}
       <style>{`
-        @keyframes hudVotePulse {
-          0%,
-          100% {
-            filter: brightness(1);
-          }
-          50% {
-            filter: brightness(1.12);
-          }
-        }
-        @keyframes hudVoteBanner {
-          0% {
-            opacity: 0;
-            transform: translate(-50%, -8px);
-          }
-          18% {
-            opacity: 1;
-            transform: translate(-50%, 0);
-          }
-          70% {
-            opacity: 1;
-            transform: translate(-50%, 0);
-          }
-          100% {
-            opacity: 0;
-            transform: translate(-50%, -4px);
-          }
-        }
         @keyframes scoreGainPop {
           0% {
             transform: translateY(14px) scale(0.45) rotate(-8deg);
@@ -1774,54 +1510,6 @@ export const GameScreen = ({
         </aside>
       </div>
 
-      {/* Clear-board vote banner — top center, fades quickly */}
-      {!isSoloMode && clearBoardBannerVisible && clearBoardInitiatorColor && (
-        <div
-          key={clearBoardExpiresAt ?? "clear-banner"}
-          role="status"
-          aria-live="polite"
-          className="pointer-events-none absolute left-1/2 top-28 z-20 whitespace-nowrap rounded-none border border-solid bg-canvas/65 px-5 py-2.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-inset ring-white/[0.08] backdrop-blur-[6px]"
-          style={{
-            borderColor: POLAR_HUD.border,
-            animation: "hudVoteBanner 2.2s ease-out forwards",
-          }}
-        >
-          <HudCornerLs />
-          <p className="relative z-[1] font-montreal text-[13px] font-semibold uppercase leading-tight tracking-[0.16em] text-white">
-            <span style={{ color: getPlayerUiLabelHex(clearBoardInitiatorColor) }}>
-              {clearBoardInitiatorName ?? getPlayerDisplayLabel(clearBoardInitiatorColor)}
-            </span>
-            <span className="font-normal text-slate-200"> wants to clear board</span>
-          </p>
-        </div>
-      )}
-
-      {/* Abandon-game vote banner — top center, fades quickly (red) */}
-      {!isSoloMode && abandonBannerVisible && abandonInitiatorColor && (
-        <div
-          key={abandonExpiresAt ?? "abandon-banner"}
-          role="status"
-          aria-live="polite"
-          className="pointer-events-none absolute left-1/2 top-28 z-20 whitespace-nowrap rounded-none border border-solid px-5 py-2.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-inset backdrop-blur-[6px]"
-          style={{
-            borderColor: "rgba(248, 113, 113, 0.55)",
-            backgroundColor: "rgba(60, 12, 18, 0.7)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), 0 0 18px rgba(248,113,113,0.18)",
-            // @ts-expect-error CSS custom property
-            "--tw-ring-color": "rgba(248,113,113,0.18)",
-            animation: "hudVoteBanner 2.2s ease-out forwards",
-          }}
-        >
-          <HudCornerLs />
-          <p className="relative z-[1] font-montreal text-[13px] font-semibold uppercase leading-tight tracking-[0.16em] text-white">
-            <span style={{ color: getPlayerUiLabelHex(abandonInitiatorColor) }}>
-              {abandonInitiatorName ?? getPlayerDisplayLabel(abandonInitiatorColor)}
-            </span>
-            <span className="font-normal text-red-100"> wants to abandon game</span>
-          </p>
-        </div>
-      )}
-
       {/* Timer Display - Bottom Center (polar blue chrome) */}
       <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
         <div
@@ -1839,239 +1527,6 @@ export const GameScreen = ({
           </div>
         </div>
       </div>
-
-      {/* Clear Board Button - Bottom Left */}
-      {!isSpectator && !isGameOver && (
-        <div className="absolute bottom-4 left-4 z-10">
-          <div className="relative flex flex-col items-stretch gap-1.5">
-            {!isSoloMode && !clearBoardVoteActive && clearBoardExpiredVisible && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="absolute bottom-full left-0 z-10 mb-2 w-[17rem] rounded-none border border-solid bg-canvas/55 px-4 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-[6px] ring-1 ring-inset ring-white/[0.06]"
-                style={{ borderColor: POLAR_HUD.border }}
-              >
-                <HudCornerLs />
-                <div className="relative z-[1]">
-                  <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.14em] text-slate-400">
-                    Clear board vote
-                  </p>
-                  <p className="mt-1 font-montreal text-[12px] font-medium leading-snug text-slate-300">
-                    Expired — not enough votes
-                  </p>
-                </div>
-              </div>
-            )}
-            {!isSoloMode && clearBoardVoteActive && clearBoardInitiatorColor && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="absolute bottom-full left-0 z-10 mb-2 w-[17rem] rounded-none border border-solid bg-canvas/55 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-[6px] ring-1 ring-inset ring-white/[0.06]"
-                style={{
-                  borderColor: POLAR_HUD.border,
-                  animation: "hudVotePulse 1.6s ease-in-out infinite",
-                }}
-              >
-                <HudCornerLs />
-                <div className="relative z-[1]">
-                  <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.14em] text-slate-400">
-                    Clear board vote
-                  </p>
-                  <p className="mt-1.5 font-montreal text-[13px] font-semibold leading-snug text-white">
-                    <span style={{ color: getPlayerUiLabelHex(clearBoardInitiatorColor) }}>
-                      {clearBoardInitiatorName ?? getPlayerDisplayLabel(clearBoardInitiatorColor)}
-                    </span>
-                    <span className="font-normal text-slate-300"> wants to clear the board</span>
-                  </p>
-                  <div className="mt-2 flex items-end justify-between gap-2">
-                    <p className="font-montreal text-[10px] uppercase leading-tight tracking-[0.14em] text-slate-400">
-                      {clearBoardVoteCount}/3 votes
-                    </p>
-                    <p className="font-montreal text-2xl font-bold tabular-nums leading-none tracking-[-0.03em] text-white">
-                      {clearBoardSecondsLeft}s
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div className="flex flex-wrap items-stretch gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (room && !hasVotedClearBoard) {
-                room.send("clearBoard", {});
-                if (!isSoloMode) {
-                  setHasVotedClearBoard(true);
-                }
-              }
-            }}
-            disabled={hasVotedClearBoard && !isSoloMode}
-            aria-label={
-              isSoloMode
-                ? "Clear the board"
-                : clearBoardVoteActive
-                  ? `Clear board vote, ${clearBoardVoteCount} of 3`
-                  : hasVotedClearBoard
-                    ? "Clear board vote submitted"
-                    : "Vote to clear the board"
-            }
-            data-ui="game-action-clear"
-            className={`relative flex min-h-9 min-w-[6.25rem] flex-col items-center justify-center rounded-none border border-solid bg-canvas/40 px-2.5 py-1.5 text-center text-white backdrop-blur-[4px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/35 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:pointer-events-none ${
-              clearBoardVoteActive ? "" : "hover:bg-canvas/55"
-            }`}
-            style={
-              clearBoardVoteActive
-                ? {
-                    backgroundColor: "rgba(15, 23, 42, 0.52)",
-                    borderColor: POLAR_HUD.border,
-                    borderRadius: 0,
-                    boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08)",
-                    backdropFilter: "blur(4px)",
-                    WebkitBackdropFilter: "blur(4px)",
-                    animation: "hudVotePulse 1.2s ease-in-out infinite",
-                  }
-                : {
-                    borderColor: POLAR_HUD.border,
-                    opacity: hasVotedClearBoard && !isSoloMode ? 0.45 : 1,
-                  }
-            }
-          >
-            <HudCornerLs />
-            <p className="relative z-[1] font-montreal text-[9px] font-semibold uppercase tracking-[0.14em] leading-tight text-white">
-              {isSoloMode
-                ? "Clear board"
-                : clearBoardVoteActive
-                  ? `${clearBoardVoteCount}/3 votes`
-                  : hasVotedClearBoard
-                    ? "Voted"
-                    : "Clear board"}
-            </p>
-            {!isSoloMode && clearBoardVoteActive && (
-              <p className="relative z-[1] mt-0.5 font-montreal text-[8px] uppercase tracking-wider text-slate-500">
-                Tap to vote
-              </p>
-            )}
-          </button>
-
-          {!isSoloMode && !abandonVoteActive && abandonExpiredVisible && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="absolute bottom-full left-0 z-10 mb-2 w-[17rem] rounded-none border border-solid px-4 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-[6px] ring-1 ring-inset"
-              style={{
-                borderColor: "rgba(248, 113, 113, 0.5)",
-                backgroundColor: "rgba(60, 12, 18, 0.55)",
-                // @ts-expect-error CSS custom property
-                "--tw-ring-color": "rgba(248,113,113,0.15)",
-              }}
-            >
-              <HudCornerLs />
-              <div className="relative z-[1]">
-                <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.14em] text-red-200/80">
-                  Abandon game vote
-                </p>
-                <p className="mt-1 font-montreal text-[12px] font-medium leading-snug text-red-100">
-                  Expired — not enough votes
-                </p>
-              </div>
-            </div>
-          )}
-          {!isSoloMode && abandonVoteActive && abandonInitiatorColor && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="absolute bottom-full left-0 z-10 mb-2 w-[17rem] rounded-none border border-solid bg-canvas/55 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-[6px] ring-1 ring-inset ring-white/[0.06]"
-              style={{
-                borderColor: POLAR_HUD.border,
-                animation: "hudVotePulse 1.6s ease-in-out infinite",
-              }}
-            >
-              <HudCornerLs />
-              <div className="relative z-[1]">
-                <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.14em] text-slate-400">
-                  Abandon game vote
-                </p>
-                <p className="mt-1.5 font-montreal text-[13px] font-semibold leading-snug text-white">
-                  <span style={{ color: getPlayerUiLabelHex(abandonInitiatorColor) }}>
-                    {abandonInitiatorName ?? getPlayerDisplayLabel(abandonInitiatorColor)}
-                  </span>
-                  <span className="font-normal text-slate-300"> wants to abandon the game</span>
-                </p>
-                <div className="mt-2 flex items-end justify-between gap-2">
-                  <p className="font-montreal text-[10px] uppercase leading-tight tracking-[0.14em] text-slate-400">
-                    {abandonVoteCount} voted
-                  </p>
-                  <p className="font-montreal text-2xl font-bold tabular-nums leading-none tracking-[-0.03em] text-white">
-                    {abandonSecondsLeft}s
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              if (room && !hasVotedAbandon) {
-                room.send("abandonGame", {});
-                if (isSoloMode) {
-                  playSound("abandon");
-                  onGameAbandonedRef.current?.();
-                } else {
-                  setHasVotedAbandon(true);
-                }
-              }
-            }}
-            disabled={hasVotedAbandon && !isSoloMode}
-            aria-label={
-              isSoloMode
-                ? "Abandon game and exit"
-                : abandonVoteActive
-                  ? `Abandon vote, ${abandonVoteCount} players voted`
-                  : hasVotedAbandon
-                    ? "Abandon vote submitted"
-                    : "Vote to abandon the match"
-            }
-            data-ui="game-action-abandon"
-            className={`relative flex min-h-9 min-w-[6.25rem] flex-col items-center justify-center rounded-none border border-solid bg-canvas/40 px-2.5 py-1.5 text-center text-white backdrop-blur-[4px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/35 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:pointer-events-none ${
-              abandonVoteActive ? "" : "hover:bg-canvas/55"
-            }`}
-            style={
-              abandonVoteActive
-                ? {
-                    backgroundColor: "rgba(15, 23, 42, 0.52)",
-                    borderColor: POLAR_HUD.border,
-                    borderRadius: 0,
-                    boxShadow: `inset 0 0 0 1px ${POLAR_HUD.border}`,
-                    backdropFilter: "blur(4px)",
-                    WebkitBackdropFilter: "blur(4px)",
-                    animation: "hudVotePulse 1.2s ease-in-out infinite",
-                  }
-                : {
-                    borderColor: POLAR_HUD.border,
-                    opacity: hasVotedAbandon && !isSoloMode ? 0.45 : 1,
-                  }
-            }
-          >
-            <HudCornerLs />
-            <p className="relative z-[1] font-montreal text-[9px] font-semibold uppercase tracking-[0.14em] leading-tight text-white">
-              {isSoloMode
-                ? "Abandon game"
-                : abandonVoteActive
-                  ? `${abandonVoteCount} voted`
-                  : hasVotedAbandon
-                    ? "Voted"
-                    : "Abandon game"}
-            </p>
-            {!isSoloMode && abandonVoteActive && (
-              <p className="relative z-[1] mt-0.5 font-montreal text-[8px] uppercase tracking-wider text-slate-500">
-                Tap to vote
-              </p>
-            )}
-          </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Spectator Badge */}
       {isSpectator && (

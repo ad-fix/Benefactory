@@ -156,7 +156,6 @@ const Index = () => {
   const prevCountdownRef = useRef(0);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const resultsReasonRef = useRef<"gameover" | "abandoned">("gameover");
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
   const [bgMusicVolume, setBgMusicVolume] = useState(0.3);
   const { play: playSound } = useSounds();
@@ -180,7 +179,6 @@ const Index = () => {
     if (!gameState.isGameOver) return;
 
     room?.leave();
-    resultsReasonRef.current = "gameover";
     setShowResults(true);
   }, [gameState.isGameOver]);
 
@@ -286,10 +284,6 @@ const Index = () => {
             window.location.href = buildReturnUrl(returnUrl, { reason: "disconnected", disconnectReason: "unexpected" });
           }
         }
-      });
-
-      gameRoom.onMessage("boardCleared", () => {
-        toast.success("Board cleared!");
       });
 
       gameRoom.onMessage("voiceReady", (message: { token: string; livekitUrl: string; roomName: string; playerColors?: Record<string, string> }) => {
@@ -547,11 +541,6 @@ const Index = () => {
         bgMusicVolume={initPayload?.bgMusicUrl ? bgMusicVolume : undefined}
         onBgMusicVolumeChange={initPayload?.bgMusicUrl ? setBgMusicVolume : undefined}
         challengeName={initPayload?.challengeName}
-        onGameAbandoned={() => {
-          room?.leave();
-          resultsReasonRef.current = "abandoned";
-          setShowResults(true);
-        }}
       />
       {/* TODO: revert — temporarily showing overlay in solo mode */}
       <PlatformVoiceOverlay
@@ -686,7 +675,7 @@ const Index = () => {
           stage={gameState.stage}
           scores={gameState.scores}
           soloMode={initPayload?.soloMode || false}
-          reason={resultsReasonRef.current}
+          reason="gameover"
           returnUrl={returnUrl}
           players={Array.from(gameState.players.values()).map((p) => ({
             name: p.name,

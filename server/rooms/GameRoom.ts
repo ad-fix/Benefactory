@@ -45,11 +45,6 @@ interface DevPaintNodeMessage {
   color: string;
 }
 
-interface ClearBoardVote {
-  sessionId: string;
-  timestamp: number;
-}
-
 export class GameRoom extends Room<GameState> {
   maxClients = 10;
   private playerColors: PlayerColor[] = ["RED", "GREEN", "BLUE"];
@@ -66,12 +61,6 @@ export class GameRoom extends Room<GameState> {
   private polarWindsSessionId: string | null = null;
   private gameTimer: ReturnType<typeof setInterval> | null = null;
   private readonly GAME_DURATION = 30 * 60; // 30 minutes in seconds
-  private clearBoardVotes: Map<string, ClearBoardVote> = new Map();
-  private clearBoardVoteTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly CLEAR_BOARD_VOTE_WINDOW = 5000; // 5 seconds
-  private abandonGameVotes: Map<string, { sessionId: string; timestamp: number }> = new Map();
-  private abandonGameVoteTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly ABANDON_GAME_VOTE_WINDOW = 10000; // 10 seconds
   private isSoloMode: boolean = false;
   private isDevMode: boolean = false;
   private livekitService: LiveKitService;
@@ -368,101 +357,6 @@ export class GameRoom extends Room<GameState> {
       this.calculateScores();
 
       console.log(`[Dev Mode] Cleared node at (${x}, ${y})`);
-    });
-
-    // Handle clear board vote
-    this.onMessage("clearBoard", (client) => {
-      const player = this.state.players.get(client.sessionId);
-      if (!player || !this.state.gameStarted) return;
-
-      // In solo mode, immediately clear the board
-      if (this.isSoloMode) {
-        this.executeClearBoard();
-        return;
-      }
-
-      // Check if this player already voted
-      if (this.clearBoardVotes.has(client.sessionId)) return;
-
-      const isFirstVote = this.clearBoardVotes.size === 0;
-
-      // Record this player's vote
-      this.clearBoardVotes.set(client.sessionId, {
-        sessionId: client.sessionId,
-        timestamp: Date.now()
-      });
-
-      // If first vote, start the timer and notify all players
-      if (isFirstVote) {
-        this.startClearBoardVoteTimer();
-
-        // Notify all players that voting has started
-        this.broadcast("clearBoardVoteStarted", {
-          initiatorColor: player.color,
-          expiresAt: Date.now() + this.CLEAR_BOARD_VOTE_WINDOW
-        });
-      }
-
-      // Broadcast updated vote count to all players
-      this.broadcast("clearBoardVoteUpdate", {
-        voterColor: player.color,
-        voteCount: this.clearBoardVotes.size,
-        requiredVotes: 3
-      });
-
-      // Check if all 3 players have voted
-      if (this.clearBoardVotes.size === 3) {
-        this.executeClearBoard();
-      }
-    });
-
-    // Handle abandon game vote
-    this.onMessage("abandonGame", (client) => {
-      const player = this.state.players.get(client.sessionId);
-      if (!player || !this.state.gameStarted || this.state.isGameOver) return;
-
-      // In solo mode, immediately abandon
-      if (this.isSoloMode) {
-        this.executeAbandonGame();
-        return;
-      }
-
-      // Check if this player already voted
-      if (this.abandonGameVotes.has(client.sessionId)) return;
-
-      const isFirstVote = this.abandonGameVotes.size === 0;
-
-      // Record this player's vote
-      this.abandonGameVotes.set(client.sessionId, {
-        sessionId: client.sessionId,
-        timestamp: Date.now()
-      });
-
-      // Count active (non-spectator) players
-      const activePlayers = [...this.state.players.keys()].filter(id => !this.spectatorSessionIds.has(id));
-      const requiredVotes = activePlayers.length;
-
-      // If first vote, start the timer and notify all players
-      if (isFirstVote) {
-        this.startAbandonGameVoteTimer();
-
-        this.broadcast("abandonGameVoteStarted", {
-          initiatorColor: player.color,
-          expiresAt: Date.now() + this.ABANDON_GAME_VOTE_WINDOW
-        });
-      }
-
-      // Broadcast updated vote count
-      this.broadcast("abandonGameVoteUpdate", {
-        voterColor: player.color,
-        voteCount: this.abandonGameVotes.size,
-        requiredVotes
-      });
-
-      // Check if all active players have voted
-      if (this.abandonGameVotes.size >= requiredVotes) {
-        this.executeAbandonGame();
-      }
     });
 
     console.log("GameRoom created!");
@@ -1531,88 +1425,6 @@ export class GameRoom extends Room<GameState> {
     }
 
     console.log(`Stage ${newStage}: Visible area expanded from ${oldGridWidth}x${oldGridHeight} to ${this.state.gridWidth}x${this.state.gridHeight}, added ${totalCollectiblesAdded} new collectibles`);
-  }
-
-  private startClearBoardVoteTimer() {
-    // Clear any existing timer
-    if (this.clearBoardVoteTimer) {
-      clearTimeout(this.clearBoardVoteTimer);
-    }
-
-    this.clearBoardVoteTimer = setTimeout(() => {
-      // Time expired without all 3 votes - reset
-      this.clearBoardVotes.clear();
-      this.clearBoardVoteTimer = null;
-
-      // Notify all players that voting expired
-      this.broadcast("clearBoardVoteExpired", {});
-      console.log("Clear board vote expired - not enough votes");
-    }, this.CLEAR_BOARD_VOTE_WINDOW);
-  }
-
-  private executeClearBoard() {
-    // Clear the timer
-    if (this.clearBoardVoteTimer) {
-      clearTimeout(this.clearBoardVoteTimer);
-      this.clearBoardVoteTimer = null;
-    }
-
-    // Clear all grid colors (set to neutral by removing them)
-    this.state.gridColors.clear();
-
-    // Reset votes
-    this.clearBoardVotes.clear();
-
-    // Recalculate scores
-    this.calculateScores();
-
-    // Notify all players that board was cleared
-    this.broadcast("boardCleared", {});
-    console.log("Board cleared by unanimous vote!");
-
-    // Log clear board for replay
-    this.logEvent({ e: "clear_board" });
-  }
-
-  private startAbandonGameVoteTimer() {
-    if (this.abandonGameVoteTimer) {
-      clearTimeout(this.abandonGameVoteTimer);
-    }
-
-    this.abandonGameVoteTimer = setTimeout(() => {
-      this.abandonGameVotes.clear();
-      this.abandonGameVoteTimer = null;
-
-      this.broadcast("abandonGameVoteExpired", {});
-      console.log("Abandon game vote expired - not enough votes");
-    }, this.ABANDON_GAME_VOTE_WINDOW);
-  }
-
-  private async executeAbandonGame() {
-    // Clear the timer
-    if (this.abandonGameVoteTimer) {
-      clearTimeout(this.abandonGameVoteTimer);
-      this.abandonGameVoteTimer = null;
-    }
-
-    // Reset votes
-    this.abandonGameVotes.clear();
-
-    console.log("Game abandoned by unanimous vote!");
-
-    if (this.gameTimer) {
-      clearInterval(this.gameTimer);
-      this.gameTimer = null;
-    }
-
-    // Notify all players — clients will call room.leave() on receiving this
-    this.broadcast("gameAbandoned", {});
-
-    // End the game as abandoned
-    this.state.isGameOver = true;
-
-    await this.endPolarWindsSession({ abandoned: true });
-    this.disconnect();
   }
 
 }
