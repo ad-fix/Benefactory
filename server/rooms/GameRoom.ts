@@ -169,12 +169,23 @@ export class GameRoom extends Room<GameState> {
 
     // Handle dev mode stage up
     this.onMessage("devStageUp", (client) => {
-      if (!this.isDevMode || !this.state.gameStarted) return;
+      if (!this.isDevMode) return;
       const nextStage = this.state.stage + 1;
       if (nextStage <= 8) {
         console.log(`[Dev Mode] Manual stage up from ${this.state.stage} to ${nextStage}.`);
         this.advanceToStage(nextStage);
       }
+    });
+
+    // Handle dev role switcher
+    this.onMessage("devSetRole", (client, message: { role: string }) => {
+      if (!this.isDevMode) return;
+      const valid: PlayerRole[] = ["OPERATOR", "ENGINEER", "MONITOR"];
+      if (!valid.includes(message.role as PlayerRole)) return;
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      player.role = message.role;
+      console.log(`[Dev Mode] Set role of ${client.sessionId} to ${message.role}`);
     });
 
     console.log("GameRoom created!");

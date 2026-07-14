@@ -176,8 +176,10 @@ const Index = () => {
     const newPlayers = new Map<string, PlayerState>();
     gameRoom.state.players?.forEach((p, id) => {
       newPlayers.set(id, { x: p.x, y: p.y, color: p.color, role: p.role || "", sessionId: p.sessionId, name: p.name || "", school: p.school || "", discordName: p.discordName || "" });
-      if (id === gameRoom.sessionId && !myColor) setMyColor(p.color);
-      if (id === gameRoom.sessionId && !myRole) setMyRole(p.role);
+      if (id === gameRoom.sessionId) {
+        if (!myColor) setMyColor(p.color);
+        setMyRole(p.role);
+      }
     });
 
     dispatch({
@@ -195,7 +197,7 @@ const Index = () => {
         currentLevel: gameRoom.state.currentLevel || "roles",
       },
     });
-  }, [myColor, myRole]);
+  }, [myColor]);
 
   const createStateUpdaterRef = useRef(createStateUpdater);
   createStateUpdaterRef.current = createStateUpdater;

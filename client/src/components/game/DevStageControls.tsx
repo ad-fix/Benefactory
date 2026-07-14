@@ -74,6 +74,12 @@ export function DevStageControls({ room, isDevMode, stage, onFakeStageChange }: 
     );
   }
 
+  const setRole = (role: "OPERATOR" | "ENGINEER" | "MONITOR") => {
+    if (room && isDevMode) {
+      room.send("devSetRole", { role });
+    }
+  };
+
   // Expanded panel
   return (
     <div
@@ -104,6 +110,23 @@ export function DevStageControls({ room, isDevMode, stage, onFakeStageChange }: 
         </button>
       </div>
       <p className="text-[9px] text-white/30">Effects only — board expands on real stage change (server-side)</p>
+      {isDevMode && (
+        <div className="flex flex-col gap-1 border-t border-white/10 pt-2">
+          <p className="text-[9px] text-white/40 uppercase tracking-wider">Set Role</p>
+          <div className="flex gap-1.5">
+            {(["OPERATOR", "ENGINEER", "MONITOR"] as const).map((role) => (
+              <button
+                key={role}
+                type="button"
+                onClick={() => setRole(role)}
+                className="rounded border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-white/20"
+              >
+                {role}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
