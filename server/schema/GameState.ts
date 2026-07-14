@@ -14,6 +14,9 @@ export class Player extends Schema {
   @type("string") discordName: string = "";
 }
 
+// Roles-level state lives here; fields will be added as the level is implemented.
+export class RolesLevelState extends Schema {}
+
 export class GameState extends Schema {
   @type("number") gridWidth: number = 10;
   @type("number") gridHeight: number = 8;
@@ -31,4 +34,8 @@ export class GameState extends Schema {
   @type("number") stage: number = 1;
 
   @type("number") seed: number = 0;
+
+  @type("string") currentLevel: string = "roles";
+
+  @type(RolesLevelState) rolesLevel = new RolesLevelState();
 }
