@@ -20,6 +20,7 @@ import { StageAnnouncement } from "@/components/game/StageAnnouncement";
 import { DevStageControls } from "@/components/game/DevStageControls";
 import { GameControls } from "@/components/game/GameControls";
 import { NebulaBackdrop } from "@/components/game/NebulaBackdrop";
+import { RolesLevelView } from "@/levels/roles/RolesLevelView";
 import {
   getFloorTint,
   getPlayerDisplayLabel,
@@ -35,6 +36,7 @@ interface PlayerState {
   x: number;
   y: number;
   color: PlayerColor;
+  role: string;
   sessionId: string;
   name: string;
   school: string;
@@ -184,6 +186,8 @@ interface GameScreenProps {
   gridWidth: number;
   gridHeight: number;
   myColor: PlayerColor | null;
+  myRole?: string | null;
+  currentLevel?: string;
   isSoloMode: boolean;
   stage: number;
   timeRemaining: number;
@@ -279,6 +283,8 @@ export const GameScreen = ({
   gridWidth,
   gridHeight,
   myColor,
+  myRole,
+  currentLevel = "roles",
   isSoloMode,
   stage,
   timeRemaining,
@@ -734,6 +740,16 @@ export const GameScreen = ({
                       : "…"}
                   </p>
                 </div>
+                {Array.from(players.values())[activePlayerIndex]?.role && (
+                  <div className="grid min-w-0 gap-1">
+                    <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                      Role
+                    </p>
+                    <p className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200">
+                      {Array.from(players.values())[activePlayerIndex].role}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="relative z-10 flex min-h-10 w-full shrink-0 flex-nowrap items-center justify-between gap-x-2 border-t border-white/10 px-3 py-2">
@@ -802,6 +818,16 @@ export const GameScreen = ({
                   {localPlayerDisplayName ?? (myColor ? getPlayerDisplayLabel(myColor) : "…")}
                 </p>
               </div>
+              {myRole && (
+                <div className="grid min-w-0 gap-1">
+                  <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                    Role
+                  </p>
+                  <p className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200">
+                    {myRole}
+                  </p>
+                </div>
+              )}
               <div className="flex w-full shrink-0 justify-end gap-0.5 border-t border-white/10 pt-2">
                 <button
                   type="button"
@@ -1015,6 +1041,8 @@ export const GameScreen = ({
       <NoiseFieldOverlay ref={noiseFieldRef} resolutionScale={0.8} />
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
+
+      {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} />}
 
     </div>
   );

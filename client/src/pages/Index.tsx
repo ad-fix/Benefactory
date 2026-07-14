@@ -26,6 +26,7 @@ interface PlayerState {
   x: number;
   y: number;
   color: PlayerColor;
+  role: string;
   sessionId: string;
   name: string;
   school: string;
@@ -42,6 +43,7 @@ interface ServerGameState {
   timeRemaining: number;
   stage: number;
   seed: number;
+  currentLevel: string;
 }
 
 // Batched game state — updated atomically via reducer
@@ -55,6 +57,7 @@ interface GameStateLocal {
   countdown: number;
   isGameOver: boolean;
   seed: number;
+  currentLevel: string;
 }
 
 type GameAction = { type: "SYNC_STATE"; payload: GameStateLocal };
@@ -69,6 +72,7 @@ const initialGameState: GameStateLocal = {
   countdown: 0,
   isGameOver: false,
   seed: 0,
+  currentLevel: "roles",
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -106,6 +110,7 @@ const Index = () => {
   // Connection state
   const [room, setRoom] = useState<Client.Room<ServerGameState> | null>(null);
   const [myColor, setMyColor] = useState<PlayerColor | null>(null);
+  const [myRole, setMyRole] = useState<string | null>(null);
   const clientRef = useRef<Client.Client | null>(null);
   const roomRef = useRef<Client.Room<ServerGameState> | null>(null);
   /** Resolved Colyseus room id — known after the initial join (joinOrCreate may
@@ -170,8 +175,9 @@ const Index = () => {
 
     const newPlayers = new Map<string, PlayerState>();
     gameRoom.state.players?.forEach((p, id) => {
-      newPlayers.set(id, { x: p.x, y: p.y, color: p.color, sessionId: p.sessionId, name: p.name || "", school: p.school || "", discordName: p.discordName || "" });
+      newPlayers.set(id, { x: p.x, y: p.y, color: p.color, role: p.role || "", sessionId: p.sessionId, name: p.name || "", school: p.school || "", discordName: p.discordName || "" });
       if (id === gameRoom.sessionId && !myColor) setMyColor(p.color);
+      if (id === gameRoom.sessionId && !myRole) setMyRole(p.role);
     });
 
     dispatch({
@@ -186,9 +192,10 @@ const Index = () => {
         countdown: gameRoom.state.countdown ?? 0,
         isGameOver: gameRoom.state.isGameOver || false,
         timeRemaining: gameRoom.state.timeRemaining ?? 30 * 60,
+        currentLevel: gameRoom.state.currentLevel || "roles",
       },
     });
-  }, [myColor]);
+  }, [myColor, myRole]);
 
   const createStateUpdaterRef = useRef(createStateUpdater);
   createStateUpdaterRef.current = createStateUpdater;
@@ -460,6 +467,8 @@ const Index = () => {
         gridWidth={gameState.gridWidth}
         gridHeight={gameState.gridHeight}
         myColor={myColor}
+        myRole={myRole}
+        currentLevel={gameState.currentLevel}
         isSoloMode={initPayload?.soloMode || false}
         stage={gameState.stage}
         timeRemaining={gameState.timeRemaining}
