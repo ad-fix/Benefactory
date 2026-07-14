@@ -1,6 +1,8 @@
 import { Room, Client } from "colyseus";
 import { GameState, Player, PlayerColor } from "../schema/GameState";
 import { LiveKitService } from "../services/LiveKitService";
+import { BaseLevel } from "../levels/BaseLevel";
+import { RolesLevel } from "../levels/RolesLevel";
 import jwt from "jsonwebtoken";
 
 interface MoveMessage {
@@ -40,6 +42,7 @@ export class GameRoom extends Room<GameState> {
   private gameStartTime: number = 0;
   private sessionEndedInDb: boolean = false;
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
+  private currentLevel: BaseLevel | null = null;
 
   onCreate(options: any) {
     console.log("GameRoom created with options:", options, "| Room ID:", this.roomId);
@@ -68,6 +71,8 @@ export class GameRoom extends Room<GameState> {
     this.state.seed = seed;
     this.state.gridWidth = this.INITIAL_VISIBLE_WIDTH;
     this.state.gridHeight = this.INITIAL_VISIBLE_HEIGHT;
+
+    this.currentLevel = new RolesLevel(this.state);
 
     console.log("Initial state set");
 
@@ -122,20 +127,10 @@ export class GameRoom extends Room<GameState> {
           break;
       }
 
-      // Check for collision with other players
-      let isBlocked = false;
-      this.state.players.forEach((otherPlayer, key) => {
-        if (key !== playerKey &&
-            otherPlayer.x === newX &&
-            otherPlayer.y === newY) {
-          isBlocked = true;
-        }
-      });
-
-      // Only move if not blocked
-      if (!isBlocked) {
+      if (this.currentLevel && this.currentLevel.canPlayerMoveTo(player, newX, newY)) {
         player.x = newX;
         player.y = newY;
+        this.currentLevel.onPlayerMove(player, newX, newY);
 
         // Log move for replay
         this.logEvent({ e: "move", p: this.userIds.get(playerKey) || playerKey, d: direction, x: newX, y: newY });
@@ -694,6 +689,14 @@ export class GameRoom extends Room<GameState> {
     // end-session endpoint so the game could be stored/replayed. Replay events are
     // still collected in-memory via logEvent() but are discarded when the room
     // disposes.
+  }
+
+  private switchLevel(next: BaseLevel) {
+    if (this.currentLevel) {
+      this.currentLevel.onDispose();
+    }
+    this.currentLevel = next;
+    this.currentLevel.onLevelStart();
   }
 
   private advanceToStage(newStage: number) {
