@@ -1,5 +1,5 @@
 import { Room, Client } from "colyseus";
-import { GameState, Player, PlayerColor } from "../schema/GameState";
+import { GameState, Player, PlayerColor, PlayerRole } from "../schema/GameState";
 import { LiveKitService } from "../services/LiveKitService";
 import { BaseLevel } from "../levels/BaseLevel";
 import { RolesLevel } from "../levels/RolesLevel";
@@ -20,6 +20,8 @@ export class GameRoom extends Room<GameState> {
   maxClients = 10;
   private playerColors: PlayerColor[] = ["RED", "GREEN", "BLUE"];
   private assignedColors = new Set<PlayerColor>();
+  private playerRoles: PlayerRole[] = ["OPERATOR", "ENGINEER", "MONITOR"];
+  private assignedRoles = new Set<PlayerRole>();
   private readonly MAX_GRID_SIZE = 26; // Full grid size (stage 8)
   private readonly INITIAL_VISIBLE_WIDTH = 10; // Starting visible width (stage 1)
   private readonly INITIAL_VISIBLE_HEIGHT = 8; // Starting visible height (stage 1)
@@ -377,6 +379,10 @@ export class GameRoom extends Room<GameState> {
     console.log(`Assigning color ${availableColor} to player ${client.sessionId}`);
     this.assignedColors.add(availableColor);
 
+    const availableRole = this.playerRoles.find((role) => !this.assignedRoles.has(role))!;
+    this.assignedRoles.add(availableRole);
+    console.log(`Assigning role ${availableRole} to player ${client.sessionId}`);
+
     // Track userId -> color mapping for reconnection
     if (userId) {
       this.userIdToColor.set(userId, availableColor);
@@ -384,6 +390,7 @@ export class GameRoom extends Room<GameState> {
 
     const player = new Player();
     player.color = availableColor;
+    player.role = availableRole;
     player.sessionId = client.sessionId;
     player.name = playerName;
     player.school = playerSchool;
@@ -423,8 +430,12 @@ export class GameRoom extends Room<GameState> {
         if (this.assignedColors.has(color)) continue;
 
         this.assignedColors.add(color);
+        const soloRole = this.playerRoles.find((role) => !this.assignedRoles.has(role))!;
+        this.assignedRoles.add(soloRole);
+
         const soloPlayer = new Player();
         soloPlayer.color = color;
+        soloPlayer.role = soloRole;
         soloPlayer.sessionId = `solo-${color.toLowerCase()}`;
         soloPlayer.name = color;
         soloPlayer.x = positions[color].x;
@@ -432,7 +443,7 @@ export class GameRoom extends Room<GameState> {
 
         this.state.players.set(soloPlayer.sessionId, soloPlayer);
 
-        console.log(`Solo mode: Created ${color} player at (${soloPlayer.x}, ${soloPlayer.y})`);
+        console.log(`Solo mode: Created ${color} player (role: ${soloRole}) at (${soloPlayer.x}, ${soloPlayer.y})`);
       }
 
       console.log("Solo mode: All 3 players created, initializing game...");
@@ -464,11 +475,13 @@ export class GameRoom extends Room<GameState> {
       if (this.isSoloMode && !userId) {
         // Solo mode fake client disconnected - free the slot immediately so new fake clients can join
         this.assignedColors.delete(player.color);
+        this.assignedRoles.delete(player.role as PlayerRole);
         this.state.players.delete(client.sessionId);
         console.log(`Solo mode fake client ${player.color} disconnected, slot freed`);
       } else if (consented && !this.state.gameStarted) {
         // Player intentionally cancelled before game started - free the slot
         this.assignedColors.delete(player.color);
+        this.assignedRoles.delete(player.role as PlayerRole);
         this.state.players.delete(client.sessionId);
         if (userId) {
           this.userIdToColor.delete(userId);

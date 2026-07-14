@@ -1,11 +1,13 @@
 import { Schema, type, MapSchema } from "@colyseus/schema";
 
 export type PlayerColor = "RED" | "GREEN" | "BLUE";
+export type PlayerRole = "OPERATOR" | "ENGINEER" | "MONITOR";
 
 export class Player extends Schema {
   @type("number") x: number = 0;
   @type("number") y: number = 0;
   @type("string") color: PlayerColor = "RED";
+  @type("string") role: string = "";
   @type("string") sessionId: string = "";
   @type("string") name: string = "";
   @type("string") school: string = "";
