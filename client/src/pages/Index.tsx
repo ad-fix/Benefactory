@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import * as Client from "colyseus.js";
 import { toast } from "sonner";
 import { GameScreen } from "@/screens/GameScreen";
-import { saveReturnUrl, loadReturnUrl, type GameInitPayload } from "@/lib/session-storage";
+import { saveReturnUrl, loadReturnUrl, clearSession, type GameInitPayload } from "@/lib/session-storage";
 import { usePlatformVoice } from "@/hooks/usePlatformVoice";
 import { useSounds } from "@/hooks/use-sounds";
 import { PlatformVoiceOverlay } from "@/components/game/PlatformVoiceOverlay";
@@ -424,6 +424,12 @@ const Index = () => {
   }, [gameState.isGameOver]);
 
 
+  const handleLeave = useCallback(() => {
+    room?.leave();
+    clearSession();
+    navigate("/", { replace: true });
+  }, [room, navigate]);
+
   if (!initPayload) {
     return (
       <div className="w-full h-screen bg-canvas flex items-center justify-center">
@@ -482,6 +488,7 @@ const Index = () => {
         bgMusicVolume={initPayload?.bgMusicUrl ? bgMusicVolume : undefined}
         onBgMusicVolumeChange={initPayload?.bgMusicUrl ? setBgMusicVolume : undefined}
         challengeName={initPayload?.challengeName}
+        onLeave={handleLeave}
       />
       {/* TODO: revert — temporarily showing overlay in solo mode */}
       <PlatformVoiceOverlay

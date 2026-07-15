@@ -10,7 +10,7 @@ import { ParticleFloor } from "@/components/ParticleFloor";
 
 import { PulseRipple } from "@/components/game/PulseRipple";
 import { ClickHandler } from "@/components/ClickHandler";
-import { Info, Settings, Volume2, VolumeX, X } from "lucide-react";
+import { Info, LogOut, Settings, Volume2, VolumeX, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSounds } from "@/hooks/use-sounds";
 // Removed: PolarAmbientParticlesCanvas, NoiseBlobFieldCanvas — hidden behind opaque R3F canvas, wasted WebGL contexts
@@ -199,6 +199,7 @@ interface GameScreenProps {
   bgMusicVolume?: number;
   onBgMusicVolumeChange?: (volume: number) => void;
   challengeName?: string;
+  onLeave?: () => void;
 }
 
 /** Horizontal slider styled to match the in-game score bar (cyan frame + navy→white gradient fill). */
@@ -296,8 +297,10 @@ export const GameScreen = ({
   bgMusicVolume,
   onBgMusicVolumeChange,
   challengeName,
+  onLeave,
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsExiting, setSettingsExiting] = useState(false);
   const [activePlayerIndex, setActivePlayerIndex] = useState(0);
@@ -786,6 +789,17 @@ export const GameScreen = ({
                   >
                     <Settings className="size-3.5" strokeWidth={1.65} aria-hidden />
                   </button>
+                  {onLeave && (
+                    <button
+                      type="button"
+                      onClick={() => setShowLeaveConfirm(true)}
+                      aria-label="Leave game"
+                      title="Leave game"
+                      className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-500 transition-colors hover:bg-white/[0.07] hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                    >
+                      <LogOut className="size-3.5" strokeWidth={1.65} aria-hidden />
+                    </button>
+                  )}
                 </div>
               </div>
             </>
@@ -850,6 +864,17 @@ export const GameScreen = ({
                 >
                   <Settings className="size-3.5" strokeWidth={1.65} aria-hidden />
                 </button>
+                {onLeave && (
+                  <button
+                    type="button"
+                    onClick={onLeave}
+                    aria-label="Leave game"
+                    title="Leave game"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-500 transition-colors hover:bg-white/[0.07] hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  >
+                    <LogOut className="size-3.5" strokeWidth={1.65} aria-hidden />
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1043,6 +1068,50 @@ export const GameScreen = ({
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
 
       {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} />}
+
+      {/* Leave confirmation dialog */}
+      {showLeaveConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-canvas/75 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="leave-dialog-title"
+        >
+          <div
+            className="relative flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-5 rounded-none border border-solid bg-canvas/90 px-6 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[8px]"
+            style={{ borderColor: POLAR_HUD.border }}
+          >
+            <HudCornerLs />
+            <div className="relative z-[1] flex flex-col gap-1.5">
+              <p
+                id="leave-dialog-title"
+                className="font-montreal text-sm font-semibold text-white"
+              >
+                Leave game?
+              </p>
+              <p className="font-montreal text-xs text-slate-400">
+                Are you sure you want to leave this game?
+              </p>
+            </div>
+            <div className="relative z-[1] flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowLeaveConfirm(false)}
+                className="flex-1 rounded-none border border-emerald-500/50 bg-emerald-950/50 px-4 py-2 font-montreal text-xs font-medium uppercase tracking-wider text-emerald-300 transition-colors hover:border-emerald-400/70 hover:bg-emerald-900/60"
+              >
+                Stay
+              </button>
+              <button
+                type="button"
+                onClick={onLeave}
+                className="flex-1 rounded-none border border-red-500/50 bg-red-950/50 px-4 py-2 font-montreal text-xs font-medium uppercase tracking-wider text-red-300 transition-colors hover:border-red-400/70 hover:bg-red-900/60"
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
