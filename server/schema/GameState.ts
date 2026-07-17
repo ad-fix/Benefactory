@@ -1,4 +1,4 @@
-import { Schema, type, MapSchema } from "@colyseus/schema";
+import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 
 export type PlayerColor = "RED" | "GREEN" | "BLUE";
 export type PlayerRole = "OPERATOR" | "ENGINEER" | "MONITOR";
@@ -23,6 +23,11 @@ export class ButtonState extends Schema {
   @type("boolean") isActive: boolean = false;
 }
 
+export class PositionState extends Schema {
+  @type("number") x: number = 0;
+  @type("number") y: number = 0;
+}
+
 export class RolesLevelState extends Schema {
   @type("number") stage: number = 1;
   @type("number") lights: number = 0;
@@ -34,6 +39,10 @@ export class RolesLevelState extends Schema {
   @type("boolean") confirmationVisible: boolean = false;
   @type("number") confirmationExpiresAt: number = 0;
   @type("number") expiryCount: number = 0;
+  @type([PositionState]) operatorSlowTiles = new ArraySchema<PositionState>();
+  @type([PositionState]) engineerSlowTiles = new ArraySchema<PositionState>();
+  @type([PositionState]) monitorSlowTiles = new ArraySchema<PositionState>();
+  @type({ map: "number" }) slowedUntilBySession = new MapSchema<number>();
 }
 
 export class GameState extends Schema {

@@ -66,6 +66,7 @@ interface RolesLevelLocal {
   confirmationVisible: boolean;
   confirmationExpiresAt: number;
   expiryCount: number;
+  slowedUntilBySession: Map<string, number>;
 }
 
 interface Ping {
@@ -1078,6 +1079,9 @@ export const GameScreen = ({
               const playerX = isMe && predictedPos ? predictedPos.x : player.x;
               const playerY = isMe && predictedPos ? predictedPos.y : player.y;
               const pos = getVisualPos(playerX, playerY, -1.5);
+              const slowedUntil = currentLevel === "roles"
+                ? rolesLevel?.slowedUntilBySession?.get(player.sessionId)
+                : undefined;
               return (
                 <Player
                   key={player.sessionId || index}
@@ -1085,6 +1089,7 @@ export const GameScreen = ({
                   position={pos}
                   rotation={0}
                   isMe={isMe}
+                  slowedUntil={slowedUntil}
                 />
               );
             })}

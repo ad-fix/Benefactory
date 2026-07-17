@@ -12,9 +12,11 @@ type PlayerProps = {
     isMe?: boolean;
     /** Multiplier for the floor CyberRing glow (e.g. tutorial spotlight). */
     ringGlowBoost?: number;
+    /** Timestamp (ms) until which the player is slowed — tints the icon while in the future. */
+    slowedUntil?: number;
 };
 
-export function Player({ color = "green", position = [0, 0, 0], rotation = 0, isMe = false, ringGlowBoost = 1 }: PlayerProps) {
+export function Player({ color = "green", position = [0, 0, 0], rotation = 0, isMe = false, ringGlowBoost = 1, slowedUntil }: PlayerProps) {
     const groupRef = useRef<THREE.Group>(null);
     const meshRef = useRef<THREE.Mesh>(null);
     const isFirstFrame = useRef(true);
@@ -31,6 +33,12 @@ export function Player({ color = "green", position = [0, 0, 0], rotation = 0, is
             rim: new THREE.Color(paletteHex.rim),
         }),
         [paletteHex],
+    );
+
+    // Desaturated/darkened version of the main color, shown while slowedUntil is in the future.
+    const slowedColor = useMemo(
+        () => colorPalette.main.clone().lerp(new THREE.Color("#3a3a3a"), 0.65),
+        [colorPalette],
     );
 
     // Glass Shader for the Rounded Cube
@@ -111,7 +119,10 @@ export function Player({ color = "green", position = [0, 0, 0], rotation = 0, is
         if (meshRef.current) {
             meshRef.current.rotation.y = state.clock.elapsedTime * 0.2;
             meshRef.current.position.y = bobOffset;
-            (meshRef.current.material as THREE.ShaderMaterial).uniforms.uTime.value = state.clock.elapsedTime;
+            const uniforms = (meshRef.current.material as THREE.ShaderMaterial).uniforms;
+            uniforms.uTime.value = state.clock.elapsedTime;
+            const isSlowed = !!slowedUntil && Date.now() < slowedUntil;
+            uniforms.uColor.value = isSlowed ? slowedColor : colorPalette.main;
         }
     });
 

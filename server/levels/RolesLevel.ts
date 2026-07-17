@@ -1,11 +1,17 @@
-import { ButtonState, Player } from "../schema/GameState";
+import { ArraySchema } from "@colyseus/schema";
+import { ButtonState, Player, PositionState } from "../schema/GameState";
 import { BaseLevel } from "./BaseLevel";
 import { BehaviorFactory } from "./roles/behaviors/BehaviorFactory";
+
+const SLOW_TILE_COUNT = 10;
+const SLOW_DURATION_MS = 3000;
+const SLOWED_MOVE_INTERVAL_MS = 500;
 
 export class RolesLevel extends BaseLevel {
   private timers: ReturnType<typeof setTimeout>[] = [];
   private prevPositions = new Map<string, { x: number; y: number }>();
   private engLastButton = new Map<string, string | null>();
+  private lastMoveAt = new Map<string, number>();
 
   onLevelStart(): void {
     this.setupStage(1);
@@ -22,6 +28,11 @@ export class RolesLevel extends BaseLevel {
     rs.confirmationX = -1;
     rs.confirmationY = -1;
     rs.confirmationExpiresAt = 0;
+    rs.operatorSlowTiles.clear();
+    rs.engineerSlowTiles.clear();
+    rs.monitorSlowTiles.clear();
+    rs.slowedUntilBySession.clear();
+    this.lastMoveAt.clear();
 
     if (n === 2) {
       for (const color of this.pickDistinctColors(2)) {
@@ -67,6 +78,48 @@ export class RolesLevel extends BaseLevel {
       engBtn.behaviorType = "MOMENTARY";
       rs.engineerButtons.set(engBtn.id, engBtn);
       console.log(`[RolesLevel] Stage ${n}: ENGINEER button at (${engPos.x}, ${engPos.y})`);
+    }
+
+    if (n >= 3) {
+      this.setupSlowTiles();
+    }
+  }
+
+  private setupSlowTiles(): void {
+    const rs = this.state.rolesLevel;
+
+    const occupied = new Set<string>();
+    this.state.players.forEach((p) => occupied.add(`${p.x},${p.y}`));
+    rs.operatorButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
+    rs.engineerButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
+
+    const roleTileLists: ArraySchema<PositionState>[] = [
+      rs.operatorSlowTiles,
+      rs.engineerSlowTiles,
+      rs.monitorSlowTiles,
+    ];
+
+    for (const tiles of roleTileLists) {
+      for (let i = 0; i < SLOW_TILE_COUNT; i++) {
+        const pos = this.pickFreePosition(occupied);
+        const tile = new PositionState();
+        tile.x = pos.x;
+        tile.y = pos.y;
+        tiles.push(tile);
+        occupied.add(`${pos.x},${pos.y}`);
+      }
+    }
+
+    console.log(`[RolesLevel] Stage ${rs.stage}: generated ${SLOW_TILE_COUNT} slow tiles per role`);
+  }
+
+  private slowTilesForRole(role: string): ArraySchema<PositionState> | null {
+    const rs = this.state.rolesLevel;
+    switch (role) {
+      case "OPERATOR": return rs.operatorSlowTiles;
+      case "ENGINEER": return rs.engineerSlowTiles;
+      case "MONITOR": return rs.monitorSlowTiles;
+      default: return null;
     }
   }
 
@@ -148,15 +201,29 @@ export class RolesLevel extends BaseLevel {
     return { x: center, y: center };
   }
 
-  canPlayerMoveTo(_player: Player, _x: number, _y: number): boolean {
+  canPlayerMoveTo(player: Player, _x: number, _y: number): boolean {
+    const rs = this.state.rolesLevel;
+    const slowedUntil = rs.slowedUntilBySession.get(player.sessionId) ?? 0;
+    if (slowedUntil > Date.now()) {
+      const last = this.lastMoveAt.get(player.sessionId) ?? 0;
+      if (Date.now() - last < SLOWED_MOVE_INTERVAL_MS) return false;
+    }
     return true;
   }
 
   onPlayerMove(player: Player, x: number, y: number): void {
+    this.lastMoveAt.set(player.sessionId, Date.now());
+
     const prev = this.prevPositions.get(player.sessionId);
     this.prevPositions.set(player.sessionId, { x, y });
 
     const rs = this.state.rolesLevel;
+
+    const slowTiles = this.slowTilesForRole(player.role);
+    if (slowTiles?.some((t) => t.x === x && t.y === y)) {
+      rs.slowedUntilBySession.set(player.sessionId, Date.now() + SLOW_DURATION_MS);
+      console.log(`[RolesLevel] ${player.role} ${player.sessionId} hit a slow tile at (${x}, ${y})`);
+    }
 
     if (player.role === "OPERATOR") {
       rs.operatorButtons.forEach((btn) => {

@@ -64,6 +64,7 @@ interface ServerGameState {
     confirmationVisible: boolean;
     confirmationExpiresAt: number;
     expiryCount: number;
+    slowedUntilBySession: Map<string, number>;
   };
 }
 
@@ -87,6 +88,7 @@ interface RolesLevelLocal {
   confirmationVisible: boolean;
   confirmationExpiresAt: number;
   expiryCount: number;
+  slowedUntilBySession: Map<string, number>;
 }
 
 // Batched game state — updated atomically via reducer
@@ -117,7 +119,7 @@ const initialGameState: GameStateLocal = {
   isGameOver: false,
   seed: 0,
   currentLevel: "roles",
-  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0 },
+  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map() },
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -242,6 +244,10 @@ const Index = () => {
     rl?.engineerButtons?.forEach((b) => {
       engineerButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive });
     });
+    const slowedUntilBySession = new Map<string, number>();
+    rl?.slowedUntilBySession?.forEach((until, sessionId) => {
+      slowedUntilBySession.set(sessionId, until);
+    });
 
     dispatch({
       type: "SYNC_STATE",
@@ -267,6 +273,7 @@ const Index = () => {
           confirmationVisible: rl?.confirmationVisible ?? false,
           confirmationExpiresAt: rl?.confirmationExpiresAt ?? 0,
           expiryCount: rl?.expiryCount ?? 0,
+          slowedUntilBySession,
         },
       },
     });
