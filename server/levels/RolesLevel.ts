@@ -116,10 +116,7 @@ export class RolesLevel extends BaseLevel {
     return { x: center, y: center };
   }
 
-  canPlayerMoveTo(player: Player, x: number, y: number): boolean {
-    for (const [, other] of this.state.players) {
-      if (other !== player && other.x === x && other.y === y) return false;
-    }
+  canPlayerMoveTo(_player: Player, _x: number, _y: number): boolean {
     return true;
   }
 

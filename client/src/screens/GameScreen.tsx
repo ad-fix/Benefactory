@@ -1069,6 +1069,10 @@ export const GameScreen = ({
 
             {/* Players */}
             {Array.from(players.values()).map((player, index) => {
+              if (currentLevel === "roles") {
+                if (isSoloMode && index !== activePlayerIndex) return null;
+                if (!isSoloMode && player.sessionId !== room?.sessionId) return null;
+              }
               const isMe = isSoloMode ? index === activePlayerIndex : player.color === myColor;
               // Use predicted position for local player in multiplayer
               const playerX = isMe && predictedPos ? predictedPos.x : player.x;
