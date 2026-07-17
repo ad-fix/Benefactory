@@ -8,14 +8,8 @@ import { monitor } from "@colyseus/monitor";
 import { createServer } from "http";
 import express from "express";
 import cors from "cors";
-import { join, dirname } from "path";
-import { writeFileSync } from "fs";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { join } from "path";
 import { GameRoom } from "./rooms/GameRoom";
-import { parseUnrealExport } from "./config/LevelSpec";
 
 const port = Number(process.env.PORT || 2567);
 const app = express();
@@ -30,47 +24,6 @@ app.use(express.json());
 // Health check endpoint
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
-});
-
-// Admin endpoint: update collectible spawn config or level spec
-app.post("/api/admin/update-config", (req, res) => {
-  try {
-    const config = req.body?.config;
-    if (!config || typeof config !== "object") {
-      return res.status(400).json({ success: false, error: "Missing or invalid config object" });
-    }
-
-    // Detect format
-    if (config.clues_per_stage) {
-      // Unreal export format → convert to LevelSpec and save
-      const levelSpec = parseUnrealExport(config);
-      const outPath = join(__dirname, "config/levels/admin-custom.json");
-      writeFileSync(outPath, JSON.stringify(levelSpec, null, 2), "utf-8");
-      return res.json({ success: true, format: "unreal_export", file: "admin-custom.json" });
-    }
-
-    if (config.stages) {
-      // Native level spec format → save directly
-      const outPath = join(__dirname, "config/levels/admin-custom.json");
-      writeFileSync(outPath, JSON.stringify(config, null, 2), "utf-8");
-      return res.json({ success: true, format: "level_spec", file: "admin-custom.json" });
-    }
-
-    if (config.collectible_spawn_rules) {
-      // Native collectible spawn config → overwrite collectible-spawn.json
-      const outPath = join(__dirname, "config/collectible-spawn.json");
-      writeFileSync(outPath, JSON.stringify(config, null, 2), "utf-8");
-      return res.json({ success: true, format: "spawn_config" });
-    }
-
-    return res.status(400).json({
-      success: false,
-      error: "Unrecognized format. Expected collectible_spawn_rules, stages, or clues_per_stage."
-    });
-  } catch (err: any) {
-    console.error("Failed to update config:", err);
-    return res.status(500).json({ success: false, error: err.message });
-  }
 });
 
 // Create a Colyseus room programmatically (called by platform edge functions)

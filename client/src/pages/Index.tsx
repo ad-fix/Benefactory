@@ -4,13 +4,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import * as Client from "colyseus.js";
 import { toast } from "sonner";
 import { GameScreen } from "@/screens/GameScreen";
-import { saveReturnUrl, loadReturnUrl, type GameInitPayload } from "@/lib/session-storage";
+import { saveReturnUrl, loadReturnUrl, clearSession, type GameInitPayload } from "@/lib/session-storage";
 import { usePlatformVoice } from "@/hooks/usePlatformVoice";
 import { useSounds } from "@/hooks/use-sounds";
 import { PlatformVoiceOverlay } from "@/components/game/PlatformVoiceOverlay";
 import { ResultsOverlay } from "@/components/game/ResultsOverlay";
-import { MilestoneShowcase } from "@/components/game/MilestoneShowcase";
-import { symbolKeyFromName, milestoneAssets, type MilestoneSymbol } from "@/lib/svg3d/assets";
 
 /** Build a redirect URL back to the platform with query params */
 function buildReturnUrl(returnUrl: string, params: Record<string, string | number>): string {
@@ -23,65 +21,74 @@ function buildReturnUrl(returnUrl: string, params: Record<string, string | numbe
 
 // Types
 type PlayerColor = "RED" | "GREEN" | "BLUE";
-type CollectibleType = "network" | "box" | "equilibrium" | "clone" | "vantage";
-
-interface UnlockedMilestone {
-  type: string;
-  name: string | null;
-  description: string | null;
-}
-type CollectibleOrientation = 0 | 90 | 180 | 270;
-type CollectibleColor = PlayerColor | "NEUTRAL";
 
 interface PlayerState {
   x: number;
   y: number;
   color: PlayerColor;
+  role: string;
   sessionId: string;
   name: string;
   school: string;
   discordName: string;
 }
 
-interface Collectible {
+interface ButtonStateServer {
+  id: string;
+  color: string;
   x: number;
   y: number;
-  color: CollectibleColor;
-  id: string;
-  type: CollectibleType;
-  isActivated: boolean;
-  isGold: boolean;
-  orientation: CollectibleOrientation;
-  isFlipped: boolean;
-  score: number;
-}
-
-type EnemyPersonality = "red-avoiding" | "green-avoiding" | "blue-avoiding" | "same-color-avoiding";
-
-interface EnemyState {
-  x: number;
-  y: number;
-  id: string;
-  personality: EnemyPersonality;
+  behaviorType: string;
+  isActive: boolean;
 }
 
 interface ServerGameState {
   players: Map<string, PlayerState>;
-  gridColors: Map<string, { color: PlayerColor }>;
-  scores: Map<string, number>;
   gridWidth: number;
   gridHeight: number;
-  totalScore: number;
-  highScore: number;
   gameStarted: boolean;
   countdown: number;
   isGameOver: boolean;
   timeRemaining: number;
-  collectibles: Map<string, Collectible>;
-  enemies: Map<string, EnemyState>;
   stage: number;
-  stageThresholds: number[];
   seed: number;
+  currentLevel: string;
+  rolesLevel?: {
+    stage: number;
+    lights: number;
+    frozen: boolean;
+    operatorButtons: Map<string, ButtonStateServer>;
+    engineerButtons: Map<string, ButtonStateServer>;
+    confirmationX: number;
+    confirmationY: number;
+    confirmationVisible: boolean;
+    confirmationExpiresAt: number;
+    expiryCount: number;
+    slowedUntilBySession: Map<string, number>;
+  };
+}
+
+interface ButtonLocal {
+  id: string;
+  color: string;
+  x: number;
+  y: number;
+  behaviorType: string;
+  isActive: boolean;
+}
+
+interface RolesLevelLocal {
+  stage: number;
+  lights: number;
+  frozen: boolean;
+  operatorButtons: ButtonLocal[];
+  engineerButtons: ButtonLocal[];
+  confirmationX: number;
+  confirmationY: number;
+  confirmationVisible: boolean;
+  confirmationExpiresAt: number;
+  expiryCount: number;
+  slowedUntilBySession: Map<string, number>;
 }
 
 // Batched game state — updated atomically via reducer
@@ -89,19 +96,14 @@ interface GameStateLocal {
   gridWidth: number;
   gridHeight: number;
   players: Map<string, PlayerState>;
-  gridColors: Map<string, PlayerColor>;
-  collectibles: Collectible[];
-  enemies: EnemyState[];
-  scores: Record<PlayerColor, number>;
-  totalScore: number;
-  highScore: number;
   gameStarted: boolean;
   stage: number;
-  stageThresholds: number[];
   timeRemaining: number;
   countdown: number;
   isGameOver: boolean;
   seed: number;
+  currentLevel: string;
+  rolesLevel: RolesLevelLocal;
 }
 
 type GameAction = { type: "SYNC_STATE"; payload: GameStateLocal };
@@ -110,19 +112,14 @@ const initialGameState: GameStateLocal = {
   gridWidth: 10,
   gridHeight: 8,
   players: new Map(),
-  gridColors: new Map(),
-  collectibles: [],
-  enemies: [],
-  scores: { RED: 0, GREEN: 0, BLUE: 0 },
-  totalScore: 0,
-  highScore: 0,
   gameStarted: false,
   stage: 1,
-  stageThresholds: [],
   timeRemaining: 30 * 60,
   countdown: 0,
   isGameOver: false,
   seed: 0,
+  currentLevel: "roles",
+  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map() },
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -160,6 +157,7 @@ const Index = () => {
   // Connection state
   const [room, setRoom] = useState<Client.Room<ServerGameState> | null>(null);
   const [myColor, setMyColor] = useState<PlayerColor | null>(null);
+  const [myRole, setMyRole] = useState<string | null>(null);
   const clientRef = useRef<Client.Client | null>(null);
   const roomRef = useRef<Client.Room<ServerGameState> | null>(null);
   /** Resolved Colyseus room id — known after the initial join (joinOrCreate may
@@ -173,17 +171,9 @@ const Index = () => {
   // UI-only state (not server-synced)
   const [showGo, setShowGo] = useState(false);
   const prevCountdownRef = useRef(0);
+  const countdownMaxRef = useRef(0);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const resultsReasonRef = useRef<"gameover" | "abandoned">("gameover");
-  // Accumulates new milestones as the server broadcasts them during the game.
-  // Keyed by player color → list of unlocks with card text from game_milestones.
-  const [unlockedDuringGame, setUnlockedDuringGame] = useState<Record<PlayerColor, UnlockedMilestone[]>>({
-    RED: [],
-    GREEN: [],
-    BLUE: [],
-  });
-  const [showMilestoneModal, setShowMilestoneModal] = useState(false);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
   const [bgMusicVolume, setBgMusicVolume] = useState(0.3);
   const { play: playSound } = useSounds();
@@ -207,18 +197,8 @@ const Index = () => {
     if (!gameState.isGameOver) return;
 
     room?.leave();
-    resultsReasonRef.current = "gameover";
     setShowResults(true);
   }, [gameState.isGameOver]);
-
-  // Open milestones modal 1s after results show, if the local player has any unlocks.
-  useEffect(() => {
-    if (!showResults || !myColor) return;
-    const myTypes = unlockedDuringGame[myColor] ?? [];
-    if (myTypes.length === 0) return;
-    const t = setTimeout(() => setShowMilestoneModal(true), 1000);
-    return () => clearTimeout(t);
-  }, [showResults, myColor, unlockedDuringGame]);
 
   // Show "GO" briefly when countdown transitions from >0 to 0,
   // and play the movement SFX on each tick from 10 down through GO (0).
@@ -227,13 +207,18 @@ const Index = () => {
     const current = gameState.countdown;
     prevCountdownRef.current = current;
 
-    if (current !== prev && current >= 0 && current <= 10) {
+    if (current > 0) countdownMaxRef.current = Math.max(countdownMaxRef.current, current);
+
+    if (current !== prev && current >= 0 && current <= countdownMaxRef.current) {
       playSound("move");
     }
 
     if (prev > 0 && current === 0) {
       setShowGo(true);
-      const timer = setTimeout(() => setShowGo(false), 600);
+      const timer = setTimeout(() => {
+        setShowGo(false);
+        countdownMaxRef.current = 0;
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, [gameState.countdown, playSound]);
@@ -243,37 +228,25 @@ const Index = () => {
 
     const newPlayers = new Map<string, PlayerState>();
     gameRoom.state.players?.forEach((p, id) => {
-      newPlayers.set(id, { x: p.x, y: p.y, color: p.color, sessionId: p.sessionId, name: p.name || "", school: p.school || "", discordName: p.discordName || "" });
-      if (id === gameRoom.sessionId && !myColor) setMyColor(p.color);
+      newPlayers.set(id, { x: p.x, y: p.y, color: p.color, role: p.role || "", sessionId: p.sessionId, name: p.name || "", school: p.school || "", discordName: p.discordName || "" });
+      if (id === gameRoom.sessionId) {
+        if (!myColor) setMyColor(p.color);
+        setMyRole(p.role);
+      }
     });
 
-    const newGridColors = new Map<string, PlayerColor>();
-    gameRoom.state.gridColors?.forEach((c, k) => { if (c.color) newGridColors.set(k, c.color); });
-
-    const newCollectibles: Collectible[] = [];
-    gameRoom.state.collectibles?.forEach((collectible) => {
-      newCollectibles.push({
-        x: collectible.x,
-        y: collectible.y,
-        color: collectible.color,
-        id: collectible.id,
-        type: collectible.type,
-        isActivated: collectible.isActivated,
-        isGold: collectible.isGold,
-        orientation: collectible.orientation as CollectibleOrientation,
-        isFlipped: collectible.isFlipped,
-        score: collectible.score || 0,
-      });
+    const rl = gameRoom.state.rolesLevel;
+    const operatorButtons: ButtonLocal[] = [];
+    rl?.operatorButtons?.forEach((b) => {
+      operatorButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive });
     });
-
-    const newEnemies: EnemyState[] = [];
-    gameRoom.state.enemies?.forEach((enemy) => {
-      newEnemies.push({
-        x: enemy.x,
-        y: enemy.y,
-        id: enemy.id,
-        personality: enemy.personality as EnemyPersonality,
-      });
+    const engineerButtons: ButtonLocal[] = [];
+    rl?.engineerButtons?.forEach((b) => {
+      engineerButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive });
+    });
+    const slowedUntilBySession = new Map<string, number>();
+    rl?.slowedUntilBySession?.forEach((until, sessionId) => {
+      slowedUntilBySession.set(sessionId, until);
     });
 
     dispatch({
@@ -281,24 +254,27 @@ const Index = () => {
       payload: {
         gridWidth: gameRoom.state.gridWidth || 10,
         gridHeight: gameRoom.state.gridHeight || 8,
-        totalScore: gameRoom.state.totalScore || 0,
         gameStarted: gameRoom.state.gameStarted || false,
         stage: gameRoom.state.stage || 1,
-        stageThresholds: Array.from(gameRoom.state.stageThresholds || []),
         seed: gameRoom.state.seed || 0,
         players: newPlayers,
-        gridColors: newGridColors,
-        collectibles: newCollectibles,
-        enemies: newEnemies,
-        scores: {
-          RED: gameRoom.state.scores?.get("RED") || 0,
-          GREEN: gameRoom.state.scores?.get("GREEN") || 0,
-          BLUE: gameRoom.state.scores?.get("BLUE") || 0,
-        },
-        highScore: gameRoom.state.highScore || 0,
         countdown: gameRoom.state.countdown ?? 0,
         isGameOver: gameRoom.state.isGameOver || false,
         timeRemaining: gameRoom.state.timeRemaining ?? 30 * 60,
+        currentLevel: gameRoom.state.currentLevel || "roles",
+        rolesLevel: {
+          stage: rl?.stage ?? 1,
+          lights: rl?.lights ?? 0,
+          frozen: rl?.frozen ?? false,
+          operatorButtons,
+          engineerButtons,
+          confirmationX: rl?.confirmationX ?? -1,
+          confirmationY: rl?.confirmationY ?? -1,
+          confirmationVisible: rl?.confirmationVisible ?? false,
+          confirmationExpiresAt: rl?.confirmationExpiresAt ?? 0,
+          expiryCount: rl?.expiryCount ?? 0,
+          slowedUntilBySession,
+        },
       },
     });
   }, [myColor]);
@@ -335,10 +311,6 @@ const Index = () => {
         }
       });
 
-      gameRoom.onMessage("boardCleared", () => {
-        toast.success("Board cleared!");
-      });
-
       gameRoom.onMessage("voiceReady", (message: { token: string; livekitUrl: string; roomName: string; playerColors?: Record<string, string> }) => {
         setVoiceToken(message.token);
         setLivekitUrl(message.livekitUrl);
@@ -346,22 +318,6 @@ const Index = () => {
           setVoiceColorMap(message.playerColors);
         }
       });
-
-      gameRoom.onMessage(
-        "milestoneUnlocked",
-        (data: { color: PlayerColor; type: string; name: string | null; description: string | null }) => {
-          setUnlockedDuringGame((prev) => {
-            const existing = prev[data.color] ?? [];
-            if (existing.some((m) => m.type === data.type)) return prev;
-            const next: UnlockedMilestone = {
-              type: data.type,
-              name: data.name,
-              description: data.description,
-            };
-            return { ...prev, [data.color]: [...existing, next] };
-          });
-        },
-      );
 
       return runSync;
     }
@@ -548,6 +504,12 @@ const Index = () => {
   }, [gameState.isGameOver]);
 
 
+  const handleLeave = useCallback(() => {
+    room?.leave();
+    clearSession();
+    navigate("/", { replace: true });
+  }, [room, navigate]);
+
   if (!initPayload) {
     return (
       <div className="w-full h-screen bg-canvas flex items-center justify-center">
@@ -590,18 +552,13 @@ const Index = () => {
       <GameScreen
         room={room}
         players={gameState.players}
-        gridColors={gameState.gridColors}
-        collectibles={gameState.collectibles}
-        enemies={gameState.enemies}
         gridWidth={gameState.gridWidth}
         gridHeight={gameState.gridHeight}
         myColor={myColor}
+        myRole={myRole}
+        currentLevel={gameState.currentLevel}
         isSoloMode={initPayload?.soloMode || false}
-        scores={gameState.scores}
-        totalScore={gameState.totalScore}
-        highScore={gameState.highScore}
         stage={gameState.stage}
-        stageThresholds={gameState.stageThresholds}
         timeRemaining={gameState.timeRemaining}
         isDevMode={initPayload?.devMode || false}
         isSpectator={isSpectator}
@@ -611,11 +568,8 @@ const Index = () => {
         bgMusicVolume={initPayload?.bgMusicUrl ? bgMusicVolume : undefined}
         onBgMusicVolumeChange={initPayload?.bgMusicUrl ? setBgMusicVolume : undefined}
         challengeName={initPayload?.challengeName}
-        onGameAbandoned={() => {
-          room?.leave();
-          resultsReasonRef.current = "abandoned";
-          setShowResults(true);
-        }}
+        rolesLevel={gameState.rolesLevel}
+        onLeave={handleLeave}
       />
       {/* TODO: revert — temporarily showing overlay in solo mode */}
       <PlatformVoiceOverlay
@@ -627,7 +581,7 @@ const Index = () => {
         colorMap={voiceColorMap}
       />
       {(gameState.countdown > 0 || showGo) && (() => {
-        const from = 10;
+        const from = countdownMaxRef.current || gameState.countdown;
         const glowIntensity = showGo ? 0.5 : Math.max(0, (from - gameState.countdown) / from) * 0.35;
         const glowSize = showGo ? 70 : 30 + ((from - gameState.countdown) / from) * 30;
 
@@ -745,12 +699,9 @@ const Index = () => {
       )}
       {showResults && (
         <ResultsOverlay
-          totalScore={gameState.totalScore}
-          highScore={gameState.highScore}
           stage={gameState.stage}
-          scores={gameState.scores}
           soloMode={initPayload?.soloMode || false}
-          reason={resultsReasonRef.current}
+          reason="gameover"
           returnUrl={returnUrl}
           players={Array.from(gameState.players.values()).map((p) => ({
             name: p.name,
@@ -767,27 +718,6 @@ const Index = () => {
           }}
         />
       )}
-      {showMilestoneModal && myColor && (() => {
-        const myUnlocks = unlockedDuringGame[myColor] ?? [];
-        const items = myUnlocks
-          .map((m) => {
-            const svgKey = symbolKeyFromName(m.type);
-            if (!svgKey) return null;
-            return {
-              svgKey,
-              name: m.name ?? milestoneAssets[svgKey].name,
-              description: m.description ?? "",
-            };
-          })
-          .filter((i): i is { svgKey: MilestoneSymbol; name: string; description: string } => i !== null);
-        if (items.length === 0) return null;
-        return (
-          <MilestoneShowcase
-            items={items}
-            onDismiss={() => setShowMilestoneModal(false)}
-          />
-        );
-      })()}
     </div>
   );
 };

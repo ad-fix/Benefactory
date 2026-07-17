@@ -1,6 +1,6 @@
 import { useRef, useCallback, useState } from "react";
 
-const SOUNDS = ["move", "ping", "activate", "deactivate", "gold", "vote", "clear", "abandon"] as const;
+const SOUNDS = ["move", "ping"] as const;
 type SoundName = (typeof SOUNDS)[number];
 
 export const useSounds = () => {
@@ -12,12 +12,6 @@ export const useSounds = () => {
     audioRef.current = {
       move: new Audio("/sounds/move.mp3"),
       ping: new Audio("/sounds/ping.mp3"),
-      activate: new Audio("/sounds/activate.mp3"),
-      deactivate: new Audio("/sounds/deactivate.mp3"),
-      gold: new Audio("/sounds/gold.mp3"),
-      vote: new Audio("/sounds/vote.mp3"),
-      clear: new Audio("/sounds/clear.mp3"),
-      abandon: new Audio("/sounds/abandon.mp3"),
     };
     for (const sound of Object.values(audioRef.current)) {
       sound.preload = "auto";
