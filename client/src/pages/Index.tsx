@@ -33,6 +33,15 @@ interface PlayerState {
   discordName: string;
 }
 
+interface ButtonStateServer {
+  id: string;
+  color: string;
+  x: number;
+  y: number;
+  behaviorType: string;
+  isActive: boolean;
+}
+
 interface ServerGameState {
   players: Map<string, PlayerState>;
   gridWidth: number;
@@ -44,6 +53,30 @@ interface ServerGameState {
   stage: number;
   seed: number;
   currentLevel: string;
+  rolesLevel?: {
+    stage: number;
+    lights: number;
+    frozen: boolean;
+    operatorButtons: Map<string, ButtonStateServer>;
+    engineerButtons: Map<string, ButtonStateServer>;
+  };
+}
+
+interface ButtonLocal {
+  id: string;
+  color: string;
+  x: number;
+  y: number;
+  behaviorType: string;
+  isActive: boolean;
+}
+
+interface RolesLevelLocal {
+  stage: number;
+  lights: number;
+  frozen: boolean;
+  operatorButtons: ButtonLocal[];
+  engineerButtons: ButtonLocal[];
 }
 
 // Batched game state — updated atomically via reducer
@@ -58,6 +91,7 @@ interface GameStateLocal {
   isGameOver: boolean;
   seed: number;
   currentLevel: string;
+  rolesLevel: RolesLevelLocal;
 }
 
 type GameAction = { type: "SYNC_STATE"; payload: GameStateLocal };
@@ -73,6 +107,7 @@ const initialGameState: GameStateLocal = {
   isGameOver: false,
   seed: 0,
   currentLevel: "roles",
+  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [] },
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -182,6 +217,16 @@ const Index = () => {
       }
     });
 
+    const rl = gameRoom.state.rolesLevel;
+    const operatorButtons: ButtonLocal[] = [];
+    rl?.operatorButtons?.forEach((b) => {
+      operatorButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive });
+    });
+    const engineerButtons: ButtonLocal[] = [];
+    rl?.engineerButtons?.forEach((b) => {
+      engineerButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive });
+    });
+
     dispatch({
       type: "SYNC_STATE",
       payload: {
@@ -195,6 +240,13 @@ const Index = () => {
         isGameOver: gameRoom.state.isGameOver || false,
         timeRemaining: gameRoom.state.timeRemaining ?? 30 * 60,
         currentLevel: gameRoom.state.currentLevel || "roles",
+        rolesLevel: {
+          stage: rl?.stage ?? 1,
+          lights: rl?.lights ?? 0,
+          frozen: rl?.frozen ?? false,
+          operatorButtons,
+          engineerButtons,
+        },
       },
     });
   }, [myColor]);
@@ -488,6 +540,7 @@ const Index = () => {
         bgMusicVolume={initPayload?.bgMusicUrl ? bgMusicVolume : undefined}
         onBgMusicVolumeChange={initPayload?.bgMusicUrl ? setBgMusicVolume : undefined}
         challengeName={initPayload?.challengeName}
+        rolesLevel={gameState.rolesLevel}
         onLeave={handleLeave}
       />
       {/* TODO: revert — temporarily showing overlay in solo mode */}

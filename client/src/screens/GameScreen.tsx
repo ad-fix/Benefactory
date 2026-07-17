@@ -21,6 +21,8 @@ import { DevStageControls } from "@/components/game/DevStageControls";
 import { GameControls } from "@/components/game/GameControls";
 import { NebulaBackdrop } from "@/components/game/NebulaBackdrop";
 import { RolesLevelView } from "@/levels/roles/RolesLevelView";
+import { ButtonDot } from "@/levels/roles/ButtonDot";
+import { StageLights } from "@/levels/roles/StageLights";
 import {
   getFloorTint,
   getPlayerDisplayLabel,
@@ -41,6 +43,23 @@ interface PlayerState {
   name: string;
   school: string;
   discordName: string;
+}
+
+interface ButtonLocal {
+  id: string;
+  color: string;
+  x: number;
+  y: number;
+  behaviorType: string;
+  isActive: boolean;
+}
+
+interface RolesLevelLocal {
+  stage: number;
+  lights: number;
+  frozen: boolean;
+  operatorButtons: ButtonLocal[];
+  engineerButtons: ButtonLocal[];
 }
 
 interface Ping {
@@ -199,6 +218,7 @@ interface GameScreenProps {
   bgMusicVolume?: number;
   onBgMusicVolumeChange?: (volume: number) => void;
   challengeName?: string;
+  rolesLevel?: RolesLevelLocal;
   onLeave?: () => void;
 }
 
@@ -297,6 +317,7 @@ export const GameScreen = ({
   bgMusicVolume,
   onBgMusicVolumeChange,
   challengeName,
+  rolesLevel,
   onLeave,
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
@@ -565,6 +586,11 @@ export const GameScreen = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [room, myColor, isSoloMode, activePlayerIndex, players, gridWidth, gridHeight, predictedPos, isDevMode, isSpectator, countdown, isGameOver]);
+
+  // Role of the player currently controlling/viewing (solo: active player; multiplayer: own role)
+  const viewingRole = isSoloMode
+    ? (Array.from(players.values())[activePlayerIndex]?.role ?? null)
+    : (myRole ?? null);
 
   // Coordinate Helper
   const getVisualPos = (absX: number, absY: number, height: number = 0) => {
@@ -920,6 +946,7 @@ export const GameScreen = ({
         </div>
       </div>
 
+      {currentLevel === "roles" && <StageLights lights={rolesLevel?.lights ?? 0} />}
 
       {/* Timer Display - Bottom Center (polar blue chrome) */}
       <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
@@ -1025,6 +1052,17 @@ export const GameScreen = ({
                 />
               );
             })}
+
+            {/* Roles level: buttons (role-gated) */}
+            {currentLevel === "roles" && rolesLevel && (() => {
+              const buttons =
+                viewingRole === "OPERATOR" ? rolesLevel.operatorButtons :
+                viewingRole === "ENGINEER" ? rolesLevel.engineerButtons :
+                [];
+              return buttons.map(btn => (
+                <ButtonDot key={btn.id} button={btn} position={getVisualPos(btn.x, btn.y, -1.85)} />
+              ));
+            })()}
 
             {/* Ping Effects */}
             {pings.map((ping) => {
