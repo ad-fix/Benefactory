@@ -3,6 +3,7 @@ import { BaseLevel } from "./BaseLevel";
 
 export class RolesLevel extends BaseLevel {
   private timers: ReturnType<typeof setTimeout>[] = [];
+  private prevPositions = new Map<string, { x: number; y: number }>();
 
   onLevelStart(): void {
     this.setupStage(1);
@@ -68,7 +69,36 @@ export class RolesLevel extends BaseLevel {
     return true;
   }
 
-  onPlayerMove(_player: Player, _x: number, _y: number): void {}
+  onPlayerMove(player: Player, x: number, y: number): void {
+    const prev = this.prevPositions.get(player.sessionId);
+    this.prevPositions.set(player.sessionId, { x, y });
+
+    if (player.role === "OPERATOR") {
+      const rs = this.state.rolesLevel;
+      rs.operatorButtons.forEach((btn) => {
+        if (btn.x === x && btn.y === y) {
+          btn.isActive = true;
+          console.log(`[RolesLevel] OPERATOR stepped on button ${btn.id} at (${x}, ${y}) — activated`);
+        } else if (prev && btn.x === prev.x && btn.y === prev.y && btn.isActive) {
+          btn.isActive = false;
+          console.log(`[RolesLevel] OPERATOR stepped off button ${btn.id} at (${prev.x}, ${prev.y}) — deactivated`);
+        }
+      });
+
+      if (this.allButtonsActive()) {
+        console.log("[RolesLevel] STAGE INPUT SATISFIED");
+      }
+    }
+  }
+
+  private allButtonsActive(): boolean {
+    const rs = this.state.rolesLevel;
+    if (rs.operatorButtons.size === 0) return false;
+    for (const [, btn] of rs.operatorButtons) {
+      if (!btn.isActive) return false;
+    }
+    return true;
+  }
 
   isLevelComplete(): boolean {
     return false;
