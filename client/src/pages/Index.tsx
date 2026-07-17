@@ -63,6 +63,7 @@ interface ServerGameState {
     confirmationY: number;
     confirmationVisible: boolean;
     confirmationExpiresAt: number;
+    expiryCount: number;
   };
 }
 
@@ -85,6 +86,7 @@ interface RolesLevelLocal {
   confirmationY: number;
   confirmationVisible: boolean;
   confirmationExpiresAt: number;
+  expiryCount: number;
 }
 
 // Batched game state — updated atomically via reducer
@@ -115,7 +117,7 @@ const initialGameState: GameStateLocal = {
   isGameOver: false,
   seed: 0,
   currentLevel: "roles",
-  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0 },
+  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0 },
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -264,6 +266,7 @@ const Index = () => {
           confirmationY: rl?.confirmationY ?? -1,
           confirmationVisible: rl?.confirmationVisible ?? false,
           confirmationExpiresAt: rl?.confirmationExpiresAt ?? 0,
+          expiryCount: rl?.expiryCount ?? 0,
         },
       },
     });

@@ -10,7 +10,7 @@ import { ParticleFloor } from "@/components/ParticleFloor";
 
 import { PulseRipple } from "@/components/game/PulseRipple";
 import { ClickHandler } from "@/components/ClickHandler";
-import { Info, LogOut, Settings, Volume2, VolumeX, X } from "lucide-react";
+import { Info, LogOut, Settings, TriangleAlert, Volume2, VolumeX, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSounds } from "@/hooks/use-sounds";
 // Removed: PolarAmbientParticlesCanvas, NoiseBlobFieldCanvas — hidden behind opaque R3F canvas, wasted WebGL contexts
@@ -65,6 +65,7 @@ interface RolesLevelLocal {
   confirmationY: number;
   confirmationVisible: boolean;
   confirmationExpiresAt: number;
+  expiryCount: number;
 }
 
 interface Ping {
@@ -952,6 +953,32 @@ export const GameScreen = ({
       </div>
 
       {currentLevel === "roles" && <StageLights lights={rolesLevel?.lights ?? 0} />}
+
+      {currentLevel === "roles" && (rolesLevel?.expiryCount ?? 0) > 0 && (
+        <div
+          key={rolesLevel!.expiryCount}
+          className="absolute left-1/2 z-20 -translate-x-1/2"
+          style={{ top: "9.5rem", animation: "expiryBanner 3s ease-out forwards" }}
+        >
+          <div
+            className="flex items-center gap-2.5 rounded-none border border-solid bg-canvas/90 px-4 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-[6px]"
+            style={{ borderColor: "rgba(239,68,68,0.45)", boxShadow: "0 0 16px rgba(239,68,68,0.15)" }}
+          >
+            <TriangleAlert className="size-3.5 shrink-0 text-red-400" strokeWidth={1.75} aria-hidden />
+            <p className="font-montreal text-[10px] font-semibold uppercase tracking-[0.1em] text-red-300">
+              Confirmation failed — relocation activated
+            </p>
+          </div>
+          <style>{`
+            @keyframes expiryBanner {
+              0%   { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+              12%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+              75%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+              100% { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+            }
+          `}</style>
+        </div>
+      )}
 
       {/* Timer Display - Bottom Center (polar blue chrome) */}
       <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">

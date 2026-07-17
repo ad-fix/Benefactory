@@ -33,6 +33,7 @@ export class RolesLevelState extends Schema {
   @type("number") confirmationY: number = -1;
   @type("boolean") confirmationVisible: boolean = false;
   @type("number") confirmationExpiresAt: number = 0;
+  @type("number") expiryCount: number = 0;
 }
 
 export class GameState extends Schema {

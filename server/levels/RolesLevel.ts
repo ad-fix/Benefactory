@@ -53,7 +53,8 @@ export class RolesLevel extends BaseLevel {
       rs.confirmationX = -1;
       rs.confirmationY = -1;
       rs.operatorButtons.forEach((btn) => { btn.isActive = false; });
-      console.log("[RolesLevel] CONFIRMATION EXPIRED");
+      rs.expiryCount++;
+      console.log(`[RolesLevel] CONFIRMATION EXPIRED (expiry #${rs.expiryCount})`);
       this.relocateAllButtons();
     }
   }
