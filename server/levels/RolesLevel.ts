@@ -1,5 +1,6 @@
 import { ButtonState, Player } from "../schema/GameState";
 import { BaseLevel } from "./BaseLevel";
+import { BehaviorFactory } from "./roles/behaviors/BehaviorFactory";
 
 export class RolesLevel extends BaseLevel {
   private timers: ReturnType<typeof setTimeout>[] = [];
@@ -130,12 +131,13 @@ export class RolesLevel extends BaseLevel {
 
     if (player.role === "OPERATOR") {
       rs.operatorButtons.forEach((btn) => {
+        const behavior = BehaviorFactory.getBehavior(btn.behaviorType);
         if (btn.x === x && btn.y === y) {
-          btn.isActive = true;
-          console.log(`[RolesLevel] OPERATOR stepped on button ${btn.id} at (${x}, ${y}) — activated`);
-        } else if (prev && btn.x === prev.x && btn.y === prev.y && btn.isActive) {
-          btn.isActive = false;
-          console.log(`[RolesLevel] OPERATOR stepped off button ${btn.id} at (${prev.x}, ${prev.y}) — deactivated`);
+          behavior.onStepOn(btn, this);
+          console.log(`[RolesLevel] OPERATOR stepped on button ${btn.id} at (${x}, ${y}) — isActive: ${btn.isActive}`);
+        } else if (prev && btn.x === prev.x && btn.y === prev.y) {
+          behavior.onStepOff(btn, this);
+          console.log(`[RolesLevel] OPERATOR stepped off button ${btn.id} at (${prev.x}, ${prev.y}) — isActive: ${btn.isActive}`);
         }
       });
 
