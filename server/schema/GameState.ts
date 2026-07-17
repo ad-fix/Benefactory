@@ -29,6 +29,10 @@ export class RolesLevelState extends Schema {
   @type("boolean") frozen: boolean = false;
   @type({ map: ButtonState }) operatorButtons = new MapSchema<ButtonState>();
   @type({ map: ButtonState }) engineerButtons = new MapSchema<ButtonState>();
+  @type("number") confirmationX: number = -1;
+  @type("number") confirmationY: number = -1;
+  @type("boolean") confirmationVisible: boolean = false;
+  @type("number") confirmationExpiresAt: number = 0;
 }
 
 export class GameState extends Schema {

@@ -59,6 +59,10 @@ interface ServerGameState {
     frozen: boolean;
     operatorButtons: Map<string, ButtonStateServer>;
     engineerButtons: Map<string, ButtonStateServer>;
+    confirmationX: number;
+    confirmationY: number;
+    confirmationVisible: boolean;
+    confirmationExpiresAt: number;
   };
 }
 
@@ -77,6 +81,10 @@ interface RolesLevelLocal {
   frozen: boolean;
   operatorButtons: ButtonLocal[];
   engineerButtons: ButtonLocal[];
+  confirmationX: number;
+  confirmationY: number;
+  confirmationVisible: boolean;
+  confirmationExpiresAt: number;
 }
 
 // Batched game state — updated atomically via reducer
@@ -107,7 +115,7 @@ const initialGameState: GameStateLocal = {
   isGameOver: false,
   seed: 0,
   currentLevel: "roles",
-  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [] },
+  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0 },
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -246,6 +254,10 @@ const Index = () => {
           frozen: rl?.frozen ?? false,
           operatorButtons,
           engineerButtons,
+          confirmationX: rl?.confirmationX ?? -1,
+          confirmationY: rl?.confirmationY ?? -1,
+          confirmationVisible: rl?.confirmationVisible ?? false,
+          confirmationExpiresAt: rl?.confirmationExpiresAt ?? 0,
         },
       },
     });

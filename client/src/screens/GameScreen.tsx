@@ -22,6 +22,7 @@ import { GameControls } from "@/components/game/GameControls";
 import { NebulaBackdrop } from "@/components/game/NebulaBackdrop";
 import { RolesLevelView } from "@/levels/roles/RolesLevelView";
 import { ButtonDot } from "@/levels/roles/ButtonDot";
+import { ConfirmationTile } from "@/levels/roles/ConfirmationTile";
 import { StageLights } from "@/levels/roles/StageLights";
 import {
   getFloorTint,
@@ -60,6 +61,10 @@ interface RolesLevelLocal {
   frozen: boolean;
   operatorButtons: ButtonLocal[];
   engineerButtons: ButtonLocal[];
+  confirmationX: number;
+  confirmationY: number;
+  confirmationVisible: boolean;
+  confirmationExpiresAt: number;
 }
 
 interface Ping {
@@ -1063,6 +1068,11 @@ export const GameScreen = ({
                 <ButtonDot key={btn.id} button={btn} position={getVisualPos(btn.x, btn.y, -1.85)} />
               ));
             })()}
+
+            {/* Roles level: confirmation tile (Monitor only) */}
+            {currentLevel === "roles" && rolesLevel?.confirmationVisible && viewingRole === "MONITOR" && (
+              <ConfirmationTile position={getVisualPos(rolesLevel.confirmationX, rolesLevel.confirmationY, -1.85)} />
+            )}
 
             {/* Ping Effects */}
             {pings.map((ping) => {

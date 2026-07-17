@@ -7,36 +7,58 @@ export class RolesLevel extends BaseLevel {
 
   onLevelStart(): void {
     this.setupStage(1);
+    const tick = setInterval(() => this.tickConfirmation(), 250);
+    this.timers.push(tick as unknown as ReturnType<typeof setTimeout>);
   }
 
   private setupStage(n: number): void {
     const rs = this.state.rolesLevel;
+    rs.stage = n;
     rs.operatorButtons.clear();
     rs.engineerButtons.clear();
+    rs.confirmationVisible = false;
+    rs.confirmationX = -1;
+    rs.confirmationY = -1;
+    rs.confirmationExpiresAt = 0;
 
-    if (n === 1) {
+    if (n <= 4) {
       const color = "BLUE";
 
       const opPos = this.randomFreePosition();
       const opBtn = new ButtonState();
-      opBtn.id = "op-1";
+      opBtn.id = `op-${n}`;
       opBtn.color = color;
       opBtn.x = opPos.x;
       opBtn.y = opPos.y;
       opBtn.behaviorType = "MOMENTARY";
       rs.operatorButtons.set(opBtn.id, opBtn);
-      console.log(`[RolesLevel] Stage 1: OPERATOR button at (${opPos.x}, ${opPos.y})`);
+      console.log(`[RolesLevel] Stage ${n}: OPERATOR button at (${opPos.x}, ${opPos.y})`);
 
       const engPos = this.randomFreePosition();
       const engBtn = new ButtonState();
-      engBtn.id = "eng-1";
+      engBtn.id = `eng-${n}`;
       engBtn.color = color;
       engBtn.x = engPos.x;
       engBtn.y = engPos.y;
       engBtn.behaviorType = "MOMENTARY";
       rs.engineerButtons.set(engBtn.id, engBtn);
-      console.log(`[RolesLevel] Stage 1: ENGINEER button at (${engPos.x}, ${engPos.y})`);
+      console.log(`[RolesLevel] Stage ${n}: ENGINEER button at (${engPos.x}, ${engPos.y})`);
     }
+  }
+
+  private tickConfirmation(): void {
+    const rs = this.state.rolesLevel;
+    if (rs.confirmationVisible && Date.now() >= rs.confirmationExpiresAt) {
+      rs.confirmationVisible = false;
+      rs.confirmationX = -1;
+      rs.confirmationY = -1;
+      rs.operatorButtons.forEach((btn) => { btn.isActive = false; });
+      console.log("[RolesLevel] CONFIRMATION EXPIRED");
+    }
+  }
+
+  private timerForStage(stage: number): number {
+    return ([12000, 10000, 8000, 6000] as const)[stage - 1] ?? 6000;
   }
 
   private randomFreePosition(): { x: number; y: number } {
@@ -73,8 +95,9 @@ export class RolesLevel extends BaseLevel {
     const prev = this.prevPositions.get(player.sessionId);
     this.prevPositions.set(player.sessionId, { x, y });
 
+    const rs = this.state.rolesLevel;
+
     if (player.role === "OPERATOR") {
-      const rs = this.state.rolesLevel;
       rs.operatorButtons.forEach((btn) => {
         if (btn.x === x && btn.y === y) {
           btn.isActive = true;
@@ -85,9 +108,32 @@ export class RolesLevel extends BaseLevel {
         }
       });
 
-      if (this.allButtonsActive()) {
-        console.log("[RolesLevel] STAGE INPUT SATISFIED");
+      if (this.allButtonsActive() && !rs.confirmationVisible) {
+        const pos = this.randomFreePosition();
+        rs.confirmationX = pos.x;
+        rs.confirmationY = pos.y;
+        rs.confirmationExpiresAt = Date.now() + this.timerForStage(rs.stage);
+        rs.confirmationVisible = true;
+        console.log(`[RolesLevel] STAGE INPUT SATISFIED — confirmation tile at (${pos.x}, ${pos.y}), expires in ${this.timerForStage(rs.stage)}ms`);
       }
+    }
+
+    if (player.role === "MONITOR" && rs.confirmationVisible && x === rs.confirmationX && y === rs.confirmationY) {
+      this.lockCheckpoint();
+    }
+  }
+
+  private lockCheckpoint(): void {
+    const rs = this.state.rolesLevel;
+    rs.confirmationVisible = false;
+    rs.confirmationX = -1;
+    rs.confirmationY = -1;
+    rs.lights++;
+    console.log(`[RolesLevel] CHECKPOINT LOCKED — lights: ${rs.lights}`);
+    if (rs.stage < 4) {
+      this.setupStage(rs.stage + 1);
+    } else {
+      console.log("[RolesLevel] LEVEL COMPLETE");
     }
   }
 
