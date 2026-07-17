@@ -54,7 +54,34 @@ export class RolesLevel extends BaseLevel {
       rs.confirmationY = -1;
       rs.operatorButtons.forEach((btn) => { btn.isActive = false; });
       console.log("[RolesLevel] CONFIRMATION EXPIRED");
+      this.relocateAllButtons();
     }
+  }
+
+  private relocateAllButtons(): void {
+    const rs = this.state.rolesLevel;
+
+    // Seed occupied with players and ALL current button positions (old positions stay excluded throughout).
+    const occupied = new Set<string>();
+    this.state.players.forEach((p) => occupied.add(`${p.x},${p.y}`));
+    rs.operatorButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
+    rs.engineerButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
+
+    rs.operatorButtons.forEach((btn) => {
+      const pos = this.pickFreePosition(occupied);
+      console.log(`[RolesLevel] Relocated OPERATOR ${btn.id}: (${btn.x},${btn.y}) → (${pos.x},${pos.y})`);
+      btn.x = pos.x;
+      btn.y = pos.y;
+      occupied.add(`${pos.x},${pos.y}`);
+    });
+
+    rs.engineerButtons.forEach((btn) => {
+      const pos = this.pickFreePosition(occupied);
+      console.log(`[RolesLevel] Relocated ENGINEER ${btn.id}: (${btn.x},${btn.y}) → (${pos.x},${pos.y})`);
+      btn.x = pos.x;
+      btn.y = pos.y;
+      occupied.add(`${pos.x},${pos.y}`);
+    });
   }
 
   private timerForStage(stage: number): number {
@@ -62,6 +89,14 @@ export class RolesLevel extends BaseLevel {
   }
 
   private randomFreePosition(): { x: number; y: number } {
+    const occupied = new Set<string>();
+    this.state.players.forEach((p) => occupied.add(`${p.x},${p.y}`));
+    this.state.rolesLevel.operatorButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
+    this.state.rolesLevel.engineerButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
+    return this.pickFreePosition(occupied);
+  }
+
+  private pickFreePosition(occupied: Set<string>): { x: number; y: number } {
     const MAX_GRID = 26;
     const center = Math.floor(MAX_GRID / 2);
     const halfW = Math.floor(this.state.gridWidth / 2);
@@ -70,11 +105,6 @@ export class RolesLevel extends BaseLevel {
     const maxX = center + halfW - 1;
     const minY = center - halfH;
     const maxY = center + halfH - 1;
-
-    const occupied = new Set<string>();
-    this.state.players.forEach((p) => occupied.add(`${p.x},${p.y}`));
-    this.state.rolesLevel.operatorButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
-    this.state.rolesLevel.engineerButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
 
     for (let i = 0; i < 200; i++) {
       const x = minX + Math.floor(Math.random() * (maxX - minX + 1));
