@@ -5,6 +5,7 @@ import { BehaviorFactory } from "./roles/behaviors/BehaviorFactory";
 export class RolesLevel extends BaseLevel {
   private timers: ReturnType<typeof setTimeout>[] = [];
   private prevPositions = new Map<string, { x: number; y: number }>();
+  private engLastButton = new Map<string, string | null>();
 
   onLevelStart(): void {
     this.setupStage(1);
@@ -22,7 +23,29 @@ export class RolesLevel extends BaseLevel {
     rs.confirmationY = -1;
     rs.confirmationExpiresAt = 0;
 
-    if (n <= 4) {
+    if (n === 2) {
+      for (const color of this.pickDistinctColors(2)) {
+        const opPos = this.randomFreePosition();
+        const opBtn = new ButtonState();
+        opBtn.id = `op-${n}-${color}`;
+        opBtn.color = color;
+        opBtn.x = opPos.x;
+        opBtn.y = opPos.y;
+        opBtn.behaviorType = "MOMENTARY";
+        rs.operatorButtons.set(opBtn.id, opBtn);
+
+        const engPos = this.randomFreePosition();
+        const engBtn = new ButtonState();
+        engBtn.id = `eng-${n}-${color}`;
+        engBtn.color = color;
+        engBtn.x = engPos.x;
+        engBtn.y = engPos.y;
+        engBtn.behaviorType = "MOMENTARY";
+        rs.engineerButtons.set(engBtn.id, engBtn);
+
+        console.log(`[RolesLevel] Stage ${n}: OPERATOR (${color}) at (${opPos.x}, ${opPos.y}), ENGINEER (${color}) at (${engPos.x}, ${engPos.y})`);
+      }
+    } else if (n <= 4) {
       const color = "BLUE";
 
       const opPos = this.randomFreePosition();
@@ -98,6 +121,15 @@ export class RolesLevel extends BaseLevel {
     return this.pickFreePosition(occupied);
   }
 
+  private pickDistinctColors(count: number): string[] {
+    const pool = ["RED", "GREEN", "BLUE"];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool.slice(0, count);
+  }
+
   private pickFreePosition(occupied: Set<string>): { x: number; y: number } {
     const MAX_GRID = 26;
     const center = Math.floor(MAX_GRID / 2);
@@ -146,6 +178,29 @@ export class RolesLevel extends BaseLevel {
         rs.confirmationVisible = true;
         console.log(`[RolesLevel] STAGE INPUT SATISFIED — confirmation tile at (${pos.x}, ${pos.y}), expires in ${this.timerForStage(rs.stage)}ms`);
       }
+    }
+
+    if (player.role === "ENGINEER") {
+      const lastBtnId = this.engLastButton.get(player.sessionId) ?? null;
+      let currentBtnId: string | null = null;
+
+      rs.engineerButtons.forEach((btn) => {
+        if (btn.x === x && btn.y === y) {
+          currentBtnId = btn.id;
+          if (lastBtnId !== btn.id) {
+            rs.operatorButtons.forEach((opBtn) => {
+              if (opBtn.color === btn.color) {
+                const next = opBtn.behaviorType === "MOMENTARY" ? "TOGGLE" : "MOMENTARY";
+                console.log(`[RolesLevel] ENGINEER flipped ${opBtn.id}: ${opBtn.behaviorType} → ${next}`);
+                opBtn.behaviorType = next;
+                opBtn.isActive = false;
+              }
+            });
+          }
+        }
+      });
+
+      this.engLastButton.set(player.sessionId, currentBtnId);
     }
 
     if (player.role === "MONITOR" && rs.confirmationVisible && x === rs.confirmationX && y === rs.confirmationY) {
