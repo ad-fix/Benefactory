@@ -14,8 +14,22 @@ export class Player extends Schema {
   @type("string") discordName: string = "";
 }
 
-// Roles-level state lives here; fields will be added as the level is implemented.
-export class RolesLevelState extends Schema {}
+export class ButtonState extends Schema {
+  @type("string") id: string = "";
+  @type("string") color: string = "";
+  @type("number") x: number = 0;
+  @type("number") y: number = 0;
+  @type("string") behaviorType: string = "MOMENTARY";
+  @type("boolean") isActive: boolean = false;
+}
+
+export class RolesLevelState extends Schema {
+  @type("number") stage: number = 1;
+  @type("number") lights: number = 0;
+  @type("boolean") frozen: boolean = false;
+  @type({ map: ButtonState }) operatorButtons = new MapSchema<ButtonState>();
+  @type({ map: ButtonState }) engineerButtons = new MapSchema<ButtonState>();
+}
 
 export class GameState extends Schema {
   @type("number") gridWidth: number = 10;

@@ -568,6 +568,7 @@ export class GameRoom extends Room<GameState> {
     await this.setPrivate(true);
 
     this.state.gameStarted = true;
+    if (this.currentLevel) this.currentLevel.onLevelStart();
 
     console.log(`Game mode: ${this.isSoloMode ? 'SOLO' : 'MULTIPLAYER'}`);
 
