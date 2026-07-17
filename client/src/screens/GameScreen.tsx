@@ -1091,13 +1091,25 @@ export const GameScreen = ({
 
             {/* Roles level: buttons (role-gated) */}
             {currentLevel === "roles" && rolesLevel && (() => {
-              const buttons =
-                viewingRole === "OPERATOR" ? rolesLevel.operatorButtons :
-                viewingRole === "ENGINEER" ? rolesLevel.engineerButtons :
-                [];
-              return buttons.map(btn => (
-                <ButtonDot key={btn.id} button={btn} position={getVisualPos(btn.x, btn.y, -1.85)} />
-              ));
+              if (viewingRole === "OPERATOR") {
+                return rolesLevel.operatorButtons.map(btn => (
+                  <ButtonDot key={btn.id} button={btn} position={getVisualPos(btn.x, btn.y, -1.85)} />
+                ));
+              }
+              if (viewingRole === "ENGINEER") {
+                return rolesLevel.engineerButtons.map(btn => {
+                  const matched = rolesLevel.operatorButtons.find(ob => ob.color === btn.color);
+                  return (
+                    <ButtonDot
+                      key={btn.id}
+                      button={btn}
+                      position={getVisualPos(btn.x, btn.y, -1.85)}
+                      matchedBehaviorType={matched?.behaviorType}
+                    />
+                  );
+                });
+              }
+              return null;
             })()}
 
             {/* Roles level: confirmation tile (Monitor only) */}
