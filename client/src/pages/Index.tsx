@@ -167,6 +167,7 @@ const Index = () => {
   // UI-only state (not server-synced)
   const [showGo, setShowGo] = useState(false);
   const prevCountdownRef = useRef(0);
+  const countdownMaxRef = useRef(0);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
@@ -202,13 +203,18 @@ const Index = () => {
     const current = gameState.countdown;
     prevCountdownRef.current = current;
 
-    if (current !== prev && current >= 0 && current <= 10) {
+    if (current > 0) countdownMaxRef.current = Math.max(countdownMaxRef.current, current);
+
+    if (current !== prev && current >= 0 && current <= countdownMaxRef.current) {
       playSound("move");
     }
 
     if (prev > 0 && current === 0) {
       setShowGo(true);
-      const timer = setTimeout(() => setShowGo(false), 600);
+      const timer = setTimeout(() => {
+        setShowGo(false);
+        countdownMaxRef.current = 0;
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, [gameState.countdown, playSound]);
@@ -565,7 +571,7 @@ const Index = () => {
         colorMap={voiceColorMap}
       />
       {(gameState.countdown > 0 || showGo) && (() => {
-        const from = 10;
+        const from = countdownMaxRef.current || gameState.countdown;
         const glowIntensity = showGo ? 0.5 : Math.max(0, (from - gameState.countdown) / from) * 0.35;
         const glowSize = showGo ? 70 : 30 + ((from - gameState.countdown) / from) * 30;
 

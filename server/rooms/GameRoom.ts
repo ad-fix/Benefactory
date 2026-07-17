@@ -584,8 +584,8 @@ export class GameRoom extends Room<GameState> {
   private startGameplay() {
     console.log("Starting countdown...");
 
-    // Start 10-second countdown
-    this.state.countdown = 10;
+    // Start 3-second countdown
+    this.state.countdown = 3;
     this.countdownTimer = setInterval(() => {
       // Explicit assignment so @colyseus/schema always encodes a patch (postfix -- can miss updates in some builds).
       const next = this.state.countdown - 1;
