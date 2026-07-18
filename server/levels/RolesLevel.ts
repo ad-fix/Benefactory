@@ -48,15 +48,7 @@ export class RolesLevel extends BaseLevel {
     this.lastMoveAt.clear();
     this.toggleActivatedAt.clear();
 
-    if (n === 2) {
-      for (const color of this.pickDistinctColors(2)) {
-        this.spawnButtonPair(n, color);
-      }
-    } else if (n === 3) {
-      for (const color of this.pickDistinctColors(3)) {
-        this.spawnButtonPair(n, color);
-      }
-    } else if (n <= 4) {
+    if (n === 1) {
       const color = "BLUE";
 
       const opPos = this.randomFreePosition();
@@ -78,6 +70,14 @@ export class RolesLevel extends BaseLevel {
       engBtn.behaviorType = "MOMENTARY";
       rs.engineerButtons.set(engBtn.id, engBtn);
       console.log(`[RolesLevel] Stage ${n}: ENGINEER button at (${engPos.x}, ${engPos.y})`);
+    } else if (n === 2) {
+      for (const color of this.pickDistinctColors(2)) {
+        this.spawnButtonPair(n, color);
+      }
+    } else if (n >= 3) {
+      for (const color of this.pickDistinctColors(3)) {
+        this.spawnButtonPair(n, color);
+      }
     }
 
     if (n >= 3) {
