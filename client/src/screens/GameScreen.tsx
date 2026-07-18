@@ -71,6 +71,7 @@ interface RolesLevelLocal {
   hiddenEngineerColor: string;
   engineerSwitchX: number;
   engineerSwitchY: number;
+  flipCooldownByColor: Map<string, number>;
 }
 
 interface Ping {
@@ -1110,12 +1111,16 @@ export const GameScreen = ({
                   .filter(btn => !(rolesLevel.stage === 4 && btn.color === rolesLevel.hiddenEngineerColor))
                   .map(btn => {
                     const matched = rolesLevel.operatorButtons.find(ob => ob.color === btn.color);
+                    const cooldownUntil = rolesLevel.stage === 4
+                      ? rolesLevel.flipCooldownByColor.get(btn.color)
+                      : undefined;
                     return (
                       <ButtonDot
                         key={btn.id}
                         button={btn}
                         position={getVisualPos(btn.x, btn.y, -1.85)}
                         matchedBehaviorType={matched?.behaviorType}
+                        cooldownUntil={cooldownUntil}
                       />
                     );
                   });

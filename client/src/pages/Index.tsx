@@ -68,6 +68,7 @@ interface ServerGameState {
     hiddenEngineerColor: string;
     engineerSwitchX: number;
     engineerSwitchY: number;
+    flipCooldownByColor: Map<string, number>;
   };
 }
 
@@ -95,6 +96,7 @@ interface RolesLevelLocal {
   hiddenEngineerColor: string;
   engineerSwitchX: number;
   engineerSwitchY: number;
+  flipCooldownByColor: Map<string, number>;
 }
 
 // Batched game state — updated atomically via reducer
@@ -125,7 +127,7 @@ const initialGameState: GameStateLocal = {
   isGameOver: false,
   seed: 0,
   currentLevel: "roles",
-  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1 },
+  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map() },
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -254,6 +256,10 @@ const Index = () => {
     rl?.slowedUntilBySession?.forEach((until, sessionId) => {
       slowedUntilBySession.set(sessionId, until);
     });
+    const flipCooldownByColor = new Map<string, number>();
+    rl?.flipCooldownByColor?.forEach((until, color) => {
+      flipCooldownByColor.set(color, until);
+    });
 
     dispatch({
       type: "SYNC_STATE",
@@ -283,6 +289,7 @@ const Index = () => {
           hiddenEngineerColor: rl?.hiddenEngineerColor ?? "",
           engineerSwitchX: rl?.engineerSwitchX ?? -1,
           engineerSwitchY: rl?.engineerSwitchY ?? -1,
+          flipCooldownByColor,
         },
       },
     });
