@@ -25,6 +25,8 @@ import { ButtonDot } from "@/levels/roles/ButtonDot";
 import { ConfirmationTile } from "@/levels/roles/ConfirmationTile";
 import { SwitchTile } from "@/levels/roles/SwitchTile";
 import { StageLights } from "@/levels/roles/StageLights";
+import { OperatorGhost } from "@/levels/roles/OperatorGhost";
+import { GhostButton } from "@/levels/roles/GhostButton";
 import {
   getFloorTint,
   getPlayerDisplayLabel,
@@ -54,6 +56,7 @@ interface ButtonLocal {
   y: number;
   behaviorType: string;
   isActive: boolean;
+  relocateAt: number;
 }
 
 interface RolesLevelLocal {
@@ -1098,6 +1101,30 @@ export const GameScreen = ({
                 />
               );
             })}
+
+            {/* Roles level: Monitor-only Operator onion-skin ghost (stage 4) */}
+            {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" && (() => {
+              const operatorPlayer = Array.from(players.values()).find(p => p.role === "OPERATOR");
+              if (!operatorPlayer) return null;
+              return (
+                <OperatorGhost
+                  color={COLOR_MAP_LOWER[operatorPlayer.color]}
+                  position={getVisualPos(operatorPlayer.x, operatorPlayer.y, -1.5)}
+                />
+              );
+            })()}
+
+            {/* Roles level: Monitor-only ghost buttons + relocation countdown (stage 4) */}
+            {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" &&
+              rolesLevel.operatorButtons.map(btn => (
+                <GhostButton
+                  key={btn.id}
+                  color={btn.color}
+                  position={getVisualPos(btn.x, btn.y, -1.85)}
+                  relocateAt={btn.relocateAt}
+                />
+              ))
+            }
 
             {/* Roles level: buttons (role-gated) */}
             {currentLevel === "roles" && rolesLevel && (() => {

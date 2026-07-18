@@ -40,6 +40,7 @@ interface ButtonStateServer {
   y: number;
   behaviorType: string;
   isActive: boolean;
+  relocateAt: number;
 }
 
 interface ServerGameState {
@@ -79,6 +80,7 @@ interface ButtonLocal {
   y: number;
   behaviorType: string;
   isActive: boolean;
+  relocateAt: number;
 }
 
 interface RolesLevelLocal {
@@ -246,11 +248,11 @@ const Index = () => {
     const rl = gameRoom.state.rolesLevel;
     const operatorButtons: ButtonLocal[] = [];
     rl?.operatorButtons?.forEach((b) => {
-      operatorButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive });
+      operatorButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive, relocateAt: b.relocateAt });
     });
     const engineerButtons: ButtonLocal[] = [];
     rl?.engineerButtons?.forEach((b) => {
-      engineerButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive });
+      engineerButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive, relocateAt: b.relocateAt });
     });
     const slowedUntilBySession = new Map<string, number>();
     rl?.slowedUntilBySession?.forEach((until, sessionId) => {
