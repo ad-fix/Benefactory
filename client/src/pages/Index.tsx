@@ -65,6 +65,9 @@ interface ServerGameState {
     confirmationExpiresAt: number;
     expiryCount: number;
     slowedUntilBySession: Map<string, number>;
+    hiddenEngineerColor: string;
+    engineerSwitchX: number;
+    engineerSwitchY: number;
   };
 }
 
@@ -89,6 +92,9 @@ interface RolesLevelLocal {
   confirmationExpiresAt: number;
   expiryCount: number;
   slowedUntilBySession: Map<string, number>;
+  hiddenEngineerColor: string;
+  engineerSwitchX: number;
+  engineerSwitchY: number;
 }
 
 // Batched game state — updated atomically via reducer
@@ -119,7 +125,7 @@ const initialGameState: GameStateLocal = {
   isGameOver: false,
   seed: 0,
   currentLevel: "roles",
-  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map() },
+  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1 },
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -274,6 +280,9 @@ const Index = () => {
           confirmationExpiresAt: rl?.confirmationExpiresAt ?? 0,
           expiryCount: rl?.expiryCount ?? 0,
           slowedUntilBySession,
+          hiddenEngineerColor: rl?.hiddenEngineerColor ?? "",
+          engineerSwitchX: rl?.engineerSwitchX ?? -1,
+          engineerSwitchY: rl?.engineerSwitchY ?? -1,
         },
       },
     });

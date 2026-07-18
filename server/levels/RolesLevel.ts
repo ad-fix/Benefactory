@@ -7,6 +7,12 @@ const SLOW_TILE_COUNT = 10;
 const SLOW_DURATION_MS = 3000;
 const SLOWED_MOVE_INTERVAL_MS = 500;
 const TOGGLE_EXPIRY_STAGE = 3;
+const BUTTON_RELOCATE_STAGE = 4;
+const RELOCATE_INTERVAL_MS = 30000;
+const HIDDEN_COLOR_STAGE = 4;
+const FLIP_COOLDOWN_STAGE = 4;
+const FLIP_COOLDOWN_MS = 10000;
+const COLOR_CYCLE = ["RED", "GREEN", "BLUE"] as const;
 
 export class RolesLevel extends BaseLevel {
   private timers: ReturnType<typeof setTimeout>[] = [];
@@ -14,12 +20,14 @@ export class RolesLevel extends BaseLevel {
   private engLastButton = new Map<string, string | null>();
   private lastMoveAt = new Map<string, number>();
   private toggleActivatedAt = new Map<string, number>();
+  private engSwitchOn = new Map<string, boolean>();
 
   onLevelStart(): void {
     this.setupStage(1);
     const tick = setInterval(() => {
       this.tickConfirmation();
       this.tickButtons();
+      this.tickButtonRelocation();
     }, 250);
     this.timers.push(tick as unknown as ReturnType<typeof setTimeout>);
   }
@@ -45,8 +53,13 @@ export class RolesLevel extends BaseLevel {
     rs.engineerSlowTiles.clear();
     rs.monitorSlowTiles.clear();
     rs.slowedUntilBySession.clear();
+    rs.hiddenEngineerColor = "";
+    rs.engineerSwitchX = -1;
+    rs.engineerSwitchY = -1;
+    rs.flipCooldownByColor.clear();
     this.lastMoveAt.clear();
     this.toggleActivatedAt.clear();
+    this.engSwitchOn.clear();
 
     if (n === 1) {
       const color = "BLUE";
@@ -82,6 +95,16 @@ export class RolesLevel extends BaseLevel {
 
     if (n >= 3) {
       this.setupSlowTiles();
+    }
+
+    if (n === BUTTON_RELOCATE_STAGE) {
+      this.stampRelocateDeadlines(Date.now());
+    }
+
+    if (n === HIDDEN_COLOR_STAGE) {
+      rs.hiddenEngineerColor = this.pickDistinctColors(1)[0];
+      this.spawnEngineerSwitchTile();
+      console.log(`[RolesLevel] Stage ${n}: hidden ENGINEER color = ${rs.hiddenEngineerColor}`);
     }
   }
 
@@ -170,6 +193,51 @@ export class RolesLevel extends BaseLevel {
     });
   }
 
+  private stampRelocateDeadlines(now: number): void {
+    const rs = this.state.rolesLevel;
+    rs.operatorButtons.forEach((btn) => { btn.relocateAt = now + RELOCATE_INTERVAL_MS; });
+  }
+
+  private tickButtonRelocation(): void {
+    const rs = this.state.rolesLevel;
+    if (rs.stage !== BUTTON_RELOCATE_STAGE) return;
+    if (rs.confirmationVisible) return;
+
+    const now = Date.now();
+    let shouldRelocate = false;
+
+    rs.operatorButtons.forEach((btn) => {
+      if (btn.isActive) {
+        btn.relocateAt = now + RELOCATE_INTERVAL_MS;
+      } else if (now >= btn.relocateAt) {
+        shouldRelocate = true;
+      }
+    });
+
+    if (shouldRelocate) {
+      this.relocateOperatorButtons(now);
+    }
+  }
+
+  private relocateOperatorButtons(now: number): void {
+    const rs = this.state.rolesLevel;
+
+    const occupied = new Set<string>();
+    this.state.players.forEach((p) => occupied.add(`${p.x},${p.y}`));
+    rs.operatorButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
+    rs.engineerButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
+
+    rs.operatorButtons.forEach((btn) => {
+      const pos = this.pickFreePosition(occupied);
+      console.log(`[RolesLevel] Stage 4: relocation deadline hit — OPERATOR ${btn.id}: (${btn.x},${btn.y}) → (${pos.x},${pos.y})`);
+      btn.x = pos.x;
+      btn.y = pos.y;
+      occupied.add(`${pos.x},${pos.y}`);
+      btn.relocateAt = now + RELOCATE_INTERVAL_MS;
+      btn.isActive = false;
+    });
+  }
+
   isAllButtonsActive(): boolean {
     return this.allButtonsActive();
   }
@@ -232,12 +300,37 @@ export class RolesLevel extends BaseLevel {
   }
 
   private pickDistinctColors(count: number): string[] {
-    const pool = ["RED", "GREEN", "BLUE"];
+    const pool = [...COLOR_CYCLE];
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
     return pool.slice(0, count);
+  }
+
+  private spawnEngineerSwitchTile(): void {
+    const rs = this.state.rolesLevel;
+
+    const occupied = new Set<string>();
+    this.state.players.forEach((p) => occupied.add(`${p.x},${p.y}`));
+    rs.operatorButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
+    rs.engineerButtons.forEach((b) => occupied.add(`${b.x},${b.y}`));
+    rs.operatorSlowTiles.forEach((t) => occupied.add(`${t.x},${t.y}`));
+    rs.engineerSlowTiles.forEach((t) => occupied.add(`${t.x},${t.y}`));
+    rs.monitorSlowTiles.forEach((t) => occupied.add(`${t.x},${t.y}`));
+
+    const pos = this.pickFreePosition(occupied);
+    rs.engineerSwitchX = pos.x;
+    rs.engineerSwitchY = pos.y;
+    console.log(`[RolesLevel] Stage 4: ENGINEER switch tile at (${pos.x}, ${pos.y})`);
+  }
+
+  private rotateHiddenEngineerColor(): void {
+    const rs = this.state.rolesLevel;
+    const idx = COLOR_CYCLE.indexOf(rs.hiddenEngineerColor as typeof COLOR_CYCLE[number]);
+    const next = COLOR_CYCLE[(idx + 1) % COLOR_CYCLE.length];
+    rs.hiddenEngineerColor = next;
+    console.log(`[RolesLevel] Stage 4: ENGINEER switch rotated hidden color → ${next}`);
   }
 
   private pickFreePosition(occupied: Set<string>): { x: number; y: number } {
@@ -312,19 +405,42 @@ export class RolesLevel extends BaseLevel {
         if (btn.x === x && btn.y === y) {
           currentBtnId = btn.id;
           if (lastBtnId !== btn.id) {
-            rs.operatorButtons.forEach((opBtn) => {
-              if (opBtn.color === btn.color) {
-                const next = opBtn.behaviorType === "MOMENTARY" ? "TOGGLE" : "MOMENTARY";
-                console.log(`[RolesLevel] ENGINEER flipped ${opBtn.id}: ${opBtn.behaviorType} → ${next}`);
-                opBtn.behaviorType = next;
-                opBtn.isActive = false;
+            const now = Date.now();
+            const isHidden = rs.stage === HIDDEN_COLOR_STAGE && btn.color === rs.hiddenEngineerColor;
+            const onCooldown = rs.stage === FLIP_COOLDOWN_STAGE
+              && (rs.flipCooldownByColor.get(btn.color) ?? 0) > now;
+
+            if (isHidden) {
+              console.log(`[RolesLevel] Stage 4: ENGINEER press on hidden color ${btn.color} ignored`);
+            } else if (onCooldown) {
+              console.log(`[RolesLevel] Stage 4: ENGINEER press on ${btn.color} ignored — flip cooldown active`);
+            } else {
+              rs.operatorButtons.forEach((opBtn) => {
+                if (opBtn.color === btn.color) {
+                  const next = opBtn.behaviorType === "MOMENTARY" ? "TOGGLE" : "MOMENTARY";
+                  console.log(`[RolesLevel] ENGINEER flipped ${opBtn.id}: ${opBtn.behaviorType} → ${next}`);
+                  opBtn.behaviorType = next;
+                  opBtn.isActive = false;
+                }
+              });
+              if (rs.stage === FLIP_COOLDOWN_STAGE) {
+                rs.flipCooldownByColor.set(btn.color, now + FLIP_COOLDOWN_MS);
               }
-            });
+            }
           }
         }
       });
 
       this.engLastButton.set(player.sessionId, currentBtnId);
+
+      if (rs.stage === HIDDEN_COLOR_STAGE) {
+        const onSwitch = x === rs.engineerSwitchX && y === rs.engineerSwitchY;
+        const wasOnSwitch = this.engSwitchOn.get(player.sessionId) ?? false;
+        if (onSwitch && !wasOnSwitch) {
+          this.rotateHiddenEngineerColor();
+        }
+        this.engSwitchOn.set(player.sessionId, onSwitch);
+      }
     }
 
     if (player.role === "MONITOR" && rs.confirmationVisible && x === rs.confirmationX && y === rs.confirmationY) {

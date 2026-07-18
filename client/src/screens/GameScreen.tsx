@@ -23,6 +23,7 @@ import { NebulaBackdrop } from "@/components/game/NebulaBackdrop";
 import { RolesLevelView } from "@/levels/roles/RolesLevelView";
 import { ButtonDot } from "@/levels/roles/ButtonDot";
 import { ConfirmationTile } from "@/levels/roles/ConfirmationTile";
+import { SwitchTile } from "@/levels/roles/SwitchTile";
 import { StageLights } from "@/levels/roles/StageLights";
 import {
   getFloorTint,
@@ -67,6 +68,9 @@ interface RolesLevelLocal {
   confirmationExpiresAt: number;
   expiryCount: number;
   slowedUntilBySession: Map<string, number>;
+  hiddenEngineerColor: string;
+  engineerSwitchX: number;
+  engineerSwitchY: number;
 }
 
 interface Ping {
@@ -1102,17 +1106,19 @@ export const GameScreen = ({
                 ));
               }
               if (viewingRole === "ENGINEER") {
-                return rolesLevel.engineerButtons.map(btn => {
-                  const matched = rolesLevel.operatorButtons.find(ob => ob.color === btn.color);
-                  return (
-                    <ButtonDot
-                      key={btn.id}
-                      button={btn}
-                      position={getVisualPos(btn.x, btn.y, -1.85)}
-                      matchedBehaviorType={matched?.behaviorType}
-                    />
-                  );
-                });
+                return rolesLevel.engineerButtons
+                  .filter(btn => !(rolesLevel.stage === 4 && btn.color === rolesLevel.hiddenEngineerColor))
+                  .map(btn => {
+                    const matched = rolesLevel.operatorButtons.find(ob => ob.color === btn.color);
+                    return (
+                      <ButtonDot
+                        key={btn.id}
+                        button={btn}
+                        position={getVisualPos(btn.x, btn.y, -1.85)}
+                        matchedBehaviorType={matched?.behaviorType}
+                      />
+                    );
+                  });
               }
               return null;
             })()}
@@ -1120,6 +1126,11 @@ export const GameScreen = ({
             {/* Roles level: confirmation tile (Monitor only) */}
             {currentLevel === "roles" && rolesLevel?.confirmationVisible && viewingRole === "MONITOR" && (
               <ConfirmationTile position={getVisualPos(rolesLevel.confirmationX, rolesLevel.confirmationY, -1.85)} />
+            )}
+
+            {/* Roles level: engineer switch tile (stage 4, Engineer only) */}
+            {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "ENGINEER" && (
+              <SwitchTile position={getVisualPos(rolesLevel.engineerSwitchX, rolesLevel.engineerSwitchY, -1.85)} />
             )}
 
             {/* Ping Effects */}
