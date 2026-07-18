@@ -6,16 +6,21 @@ import { BehaviorFactory } from "./roles/behaviors/BehaviorFactory";
 const SLOW_TILE_COUNT = 10;
 const SLOW_DURATION_MS = 3000;
 const SLOWED_MOVE_INTERVAL_MS = 500;
+const TOGGLE_EXPIRY_STAGE = 3;
 
 export class RolesLevel extends BaseLevel {
   private timers: ReturnType<typeof setTimeout>[] = [];
   private prevPositions = new Map<string, { x: number; y: number }>();
   private engLastButton = new Map<string, string | null>();
   private lastMoveAt = new Map<string, number>();
+  private toggleActivatedAt = new Map<string, number>();
 
   onLevelStart(): void {
     this.setupStage(1);
-    const tick = setInterval(() => this.tickConfirmation(), 250);
+    const tick = setInterval(() => {
+      this.tickConfirmation();
+      this.tickButtons();
+    }, 250);
     this.timers.push(tick as unknown as ReturnType<typeof setTimeout>);
   }
 
@@ -33,28 +38,15 @@ export class RolesLevel extends BaseLevel {
     rs.monitorSlowTiles.clear();
     rs.slowedUntilBySession.clear();
     this.lastMoveAt.clear();
+    this.toggleActivatedAt.clear();
 
     if (n === 2) {
       for (const color of this.pickDistinctColors(2)) {
-        const opPos = this.randomFreePosition();
-        const opBtn = new ButtonState();
-        opBtn.id = `op-${n}-${color}`;
-        opBtn.color = color;
-        opBtn.x = opPos.x;
-        opBtn.y = opPos.y;
-        opBtn.behaviorType = "MOMENTARY";
-        rs.operatorButtons.set(opBtn.id, opBtn);
-
-        const engPos = this.randomFreePosition();
-        const engBtn = new ButtonState();
-        engBtn.id = `eng-${n}-${color}`;
-        engBtn.color = color;
-        engBtn.x = engPos.x;
-        engBtn.y = engPos.y;
-        engBtn.behaviorType = "MOMENTARY";
-        rs.engineerButtons.set(engBtn.id, engBtn);
-
-        console.log(`[RolesLevel] Stage ${n}: OPERATOR (${color}) at (${opPos.x}, ${opPos.y}), ENGINEER (${color}) at (${engPos.x}, ${engPos.y})`);
+        this.spawnButtonPair(n, color);
+      }
+    } else if (n === 3) {
+      for (const color of this.pickDistinctColors(3)) {
+        this.spawnButtonPair(n, color);
       }
     } else if (n <= 4) {
       const color = "BLUE";
@@ -83,6 +75,30 @@ export class RolesLevel extends BaseLevel {
     if (n >= 3) {
       this.setupSlowTiles();
     }
+  }
+
+  private spawnButtonPair(n: number, color: string): void {
+    const rs = this.state.rolesLevel;
+
+    const opPos = this.randomFreePosition();
+    const opBtn = new ButtonState();
+    opBtn.id = `op-${n}-${color}`;
+    opBtn.color = color;
+    opBtn.x = opPos.x;
+    opBtn.y = opPos.y;
+    opBtn.behaviorType = "MOMENTARY";
+    rs.operatorButtons.set(opBtn.id, opBtn);
+
+    const engPos = this.randomFreePosition();
+    const engBtn = new ButtonState();
+    engBtn.id = `eng-${n}-${color}`;
+    engBtn.color = color;
+    engBtn.x = engPos.x;
+    engBtn.y = engPos.y;
+    engBtn.behaviorType = "MOMENTARY";
+    rs.engineerButtons.set(engBtn.id, engBtn);
+
+    console.log(`[RolesLevel] Stage ${n}: OPERATOR (${color}) at (${opPos.x}, ${opPos.y}), ENGINEER (${color}) at (${engPos.x}, ${engPos.y})`);
   }
 
   private setupSlowTiles(): void {
@@ -134,6 +150,39 @@ export class RolesLevel extends BaseLevel {
       console.log(`[RolesLevel] CONFIRMATION EXPIRED (expiry #${rs.expiryCount})`);
       this.relocateAllButtons();
     }
+  }
+
+  private tickButtons(): void {
+    const rs = this.state.rolesLevel;
+    if (rs.stage < TOGGLE_EXPIRY_STAGE) return;
+
+    const now = Date.now();
+    rs.operatorButtons.forEach((btn) => {
+      BehaviorFactory.getBehavior(btn.behaviorType).tick(btn, now, this);
+    });
+  }
+
+  isAllButtonsActive(): boolean {
+    return this.allButtonsActive();
+  }
+
+  isPlayerStandingOn(x: number, y: number): boolean {
+    for (const [, p] of this.state.players) {
+      if (p.x === x && p.y === y) return true;
+    }
+    return false;
+  }
+
+  getToggleActivatedAt(buttonId: string): number | undefined {
+    return this.toggleActivatedAt.get(buttonId);
+  }
+
+  setToggleActivatedAt(buttonId: string, timestamp: number): void {
+    this.toggleActivatedAt.set(buttonId, timestamp);
+  }
+
+  clearToggleActivatedAt(buttonId: string): void {
+    this.toggleActivatedAt.delete(buttonId);
   }
 
   private relocateAllButtons(): void {
