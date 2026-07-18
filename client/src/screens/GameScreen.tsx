@@ -1163,7 +1163,7 @@ export const GameScreen = ({
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
 
-      {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} />}
+      {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} room={room} />}
 
       {/* Leave confirmation dialog */}
       {showLeaveConfirm && (

@@ -24,6 +24,14 @@ export class RolesLevel extends BaseLevel {
     this.timers.push(tick as unknown as ReturnType<typeof setTimeout>);
   }
 
+  devSetStage(n: number): void {
+    if (n < 1 || n > 4) return;
+    const rs = this.state.rolesLevel;
+    rs.lights = n - 1;
+    this.setupStage(n);
+    console.log(`[RolesLevel] DEV: jumped to stage ${n} (lights=${rs.lights})`);
+  }
+
   private setupStage(n: number): void {
     const rs = this.state.rolesLevel;
     rs.stage = n;
