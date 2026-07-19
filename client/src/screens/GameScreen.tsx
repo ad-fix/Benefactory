@@ -3,6 +3,7 @@ import type { ErrorInfo, ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrthographicCamera } from "@react-three/drei";
 import * as Client from "colyseus.js";
+import { Level1Mesh } from "@/components/game/Level1Mesh";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 import { Player } from "@/components/Player";
@@ -400,7 +401,6 @@ export const GameScreen = ({
     if (!room) return;
 
     const handlePing = (message: { x: number; y: number; color: PlayerColor }) => {
-      playSound("ping");
       const now = Date.now();
       const newPing: Ping = {
         id: crypto.randomUUID(),
@@ -570,8 +570,7 @@ export const GameScreen = ({
           );
 
           if (!isBlocked) {
-            playSound("move");
-            // Track this pending input
+                        // Track this pending input
             const seq = ++seqCounterRef.current;
             pendingInputsRef.current.set(seq, { x: newX, y: newY });
             setPredictedPos({ x: newX, y: newY });
@@ -1073,7 +1072,7 @@ export const GameScreen = ({
         <ambientLight intensity={0.7} />
         <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
         <pointLight position={[-10, -10, -10]} intensity={0.5} color={getFloorTint("GREEN")} />
-
+        < Level1Mesh /> 
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
 
             {/* Players */}
