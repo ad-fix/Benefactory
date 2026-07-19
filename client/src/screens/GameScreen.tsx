@@ -8,6 +8,9 @@ import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 import { Player } from "@/components/Player";
 import { ParticleFloor } from "@/components/ParticleFloor";
+import { useAmbientMusic } from "@/hooks/use-ambient-music";
+import { LEVEL_MUSIC, DEFAULT_LEVEL_MUSIC } from "@/constants/levelMusic";
+// adding in ambient music to levels
 
 import { PulseRipple } from "@/components/game/PulseRipple";
 import { ClickHandler } from "@/components/ClickHandler";
@@ -337,6 +340,7 @@ export const GameScreen = ({
   onLeave,
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
+  useAmbientMusic(LEVEL_MUSIC[currentLevel] ?? DEFAULT_LEVEL_MUSIC);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsExiting, setSettingsExiting] = useState(false);
