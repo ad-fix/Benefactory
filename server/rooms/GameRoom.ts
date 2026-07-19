@@ -177,6 +177,17 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
+    // Handle dev stage skip (roles level)
+    this.onMessage("devSetStage", (client, message: { stage: number }) => {
+      if (!this.isDevMode) return;
+      const stage = message.stage;
+      if (!Number.isInteger(stage) || stage < 1 || stage > 4) return;
+      if (this.currentLevel instanceof RolesLevel) {
+        console.log(`[Dev Mode] Manual roles-level stage skip to ${stage}.`);
+        this.currentLevel.devSetStage(stage);
+      }
+    });
+
     // Handle dev role switcher
     this.onMessage("devSetRole", (client, message: { role: string }) => {
       if (!this.isDevMode) return;

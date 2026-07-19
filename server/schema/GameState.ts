@@ -21,6 +21,7 @@ export class ButtonState extends Schema {
   @type("number") y: number = 0;
   @type("string") behaviorType: string = "MOMENTARY";
   @type("boolean") isActive: boolean = false;
+  @type("number") relocateAt: number = 0;
 }
 
 export class PositionState extends Schema {
@@ -43,6 +44,10 @@ export class RolesLevelState extends Schema {
   @type([PositionState]) engineerSlowTiles = new ArraySchema<PositionState>();
   @type([PositionState]) monitorSlowTiles = new ArraySchema<PositionState>();
   @type({ map: "number" }) slowedUntilBySession = new MapSchema<number>();
+  @type("string") hiddenEngineerColor: string = "";
+  @type("number") engineerSwitchX: number = -1;
+  @type("number") engineerSwitchY: number = -1;
+  @type({ map: "number" }) flipCooldownByColor = new MapSchema<number>();
 }
 
 export class GameState extends Schema {

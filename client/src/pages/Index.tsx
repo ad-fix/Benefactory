@@ -40,6 +40,7 @@ interface ButtonStateServer {
   y: number;
   behaviorType: string;
   isActive: boolean;
+  relocateAt: number;
 }
 
 interface ServerGameState {
@@ -65,6 +66,10 @@ interface ServerGameState {
     confirmationExpiresAt: number;
     expiryCount: number;
     slowedUntilBySession: Map<string, number>;
+    hiddenEngineerColor: string;
+    engineerSwitchX: number;
+    engineerSwitchY: number;
+    flipCooldownByColor: Map<string, number>;
   };
 }
 
@@ -75,6 +80,7 @@ interface ButtonLocal {
   y: number;
   behaviorType: string;
   isActive: boolean;
+  relocateAt: number;
 }
 
 interface RolesLevelLocal {
@@ -89,6 +95,10 @@ interface RolesLevelLocal {
   confirmationExpiresAt: number;
   expiryCount: number;
   slowedUntilBySession: Map<string, number>;
+  hiddenEngineerColor: string;
+  engineerSwitchX: number;
+  engineerSwitchY: number;
+  flipCooldownByColor: Map<string, number>;
 }
 
 // Batched game state — updated atomically via reducer
@@ -119,7 +129,7 @@ const initialGameState: GameStateLocal = {
   isGameOver: false,
   seed: 0,
   currentLevel: "roles",
-  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map() },
+  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map() },
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -238,15 +248,19 @@ const Index = () => {
     const rl = gameRoom.state.rolesLevel;
     const operatorButtons: ButtonLocal[] = [];
     rl?.operatorButtons?.forEach((b) => {
-      operatorButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive });
+      operatorButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive, relocateAt: b.relocateAt });
     });
     const engineerButtons: ButtonLocal[] = [];
     rl?.engineerButtons?.forEach((b) => {
-      engineerButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive });
+      engineerButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive, relocateAt: b.relocateAt });
     });
     const slowedUntilBySession = new Map<string, number>();
     rl?.slowedUntilBySession?.forEach((until, sessionId) => {
       slowedUntilBySession.set(sessionId, until);
+    });
+    const flipCooldownByColor = new Map<string, number>();
+    rl?.flipCooldownByColor?.forEach((until, color) => {
+      flipCooldownByColor.set(color, until);
     });
 
     dispatch({
@@ -274,6 +288,10 @@ const Index = () => {
           confirmationExpiresAt: rl?.confirmationExpiresAt ?? 0,
           expiryCount: rl?.expiryCount ?? 0,
           slowedUntilBySession,
+          hiddenEngineerColor: rl?.hiddenEngineerColor ?? "",
+          engineerSwitchX: rl?.engineerSwitchX ?? -1,
+          engineerSwitchY: rl?.engineerSwitchY ?? -1,
+          flipCooldownByColor,
         },
       },
     });

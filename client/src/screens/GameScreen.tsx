@@ -23,7 +23,10 @@ import { NebulaBackdrop } from "@/components/game/NebulaBackdrop";
 import { RolesLevelView } from "@/levels/roles/RolesLevelView";
 import { ButtonDot } from "@/levels/roles/ButtonDot";
 import { ConfirmationTile } from "@/levels/roles/ConfirmationTile";
+import { SwitchTile } from "@/levels/roles/SwitchTile";
 import { StageLights } from "@/levels/roles/StageLights";
+import { OperatorGhost } from "@/levels/roles/OperatorGhost";
+import { GhostButton } from "@/levels/roles/GhostButton";
 import {
   getFloorTint,
   getPlayerDisplayLabel,
@@ -53,6 +56,7 @@ interface ButtonLocal {
   y: number;
   behaviorType: string;
   isActive: boolean;
+  relocateAt: number;
 }
 
 interface RolesLevelLocal {
@@ -67,6 +71,10 @@ interface RolesLevelLocal {
   confirmationExpiresAt: number;
   expiryCount: number;
   slowedUntilBySession: Map<string, number>;
+  hiddenEngineerColor: string;
+  engineerSwitchX: number;
+  engineerSwitchY: number;
+  flipCooldownByColor: Map<string, number>;
 }
 
 interface Ping {
@@ -1094,6 +1102,30 @@ export const GameScreen = ({
               );
             })}
 
+            {/* Roles level: Monitor-only Operator onion-skin ghost (stage 4) */}
+            {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" && (() => {
+              const operatorPlayer = Array.from(players.values()).find(p => p.role === "OPERATOR");
+              if (!operatorPlayer) return null;
+              return (
+                <OperatorGhost
+                  color={COLOR_MAP_LOWER[operatorPlayer.color]}
+                  position={getVisualPos(operatorPlayer.x, operatorPlayer.y, -1.5)}
+                />
+              );
+            })()}
+
+            {/* Roles level: Monitor-only ghost buttons + relocation countdown (stage 4) */}
+            {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" &&
+              rolesLevel.operatorButtons.map(btn => (
+                <GhostButton
+                  key={btn.id}
+                  color={btn.color}
+                  position={getVisualPos(btn.x, btn.y, -1.85)}
+                  relocateAt={btn.relocateAt}
+                />
+              ))
+            }
+
             {/* Roles level: buttons (role-gated) */}
             {currentLevel === "roles" && rolesLevel && (() => {
               if (viewingRole === "OPERATOR") {
@@ -1102,17 +1134,23 @@ export const GameScreen = ({
                 ));
               }
               if (viewingRole === "ENGINEER") {
-                return rolesLevel.engineerButtons.map(btn => {
-                  const matched = rolesLevel.operatorButtons.find(ob => ob.color === btn.color);
-                  return (
-                    <ButtonDot
-                      key={btn.id}
-                      button={btn}
-                      position={getVisualPos(btn.x, btn.y, -1.85)}
-                      matchedBehaviorType={matched?.behaviorType}
-                    />
-                  );
-                });
+                return rolesLevel.engineerButtons
+                  .filter(btn => !(rolesLevel.stage === 4 && btn.color === rolesLevel.hiddenEngineerColor))
+                  .map(btn => {
+                    const matched = rolesLevel.operatorButtons.find(ob => ob.color === btn.color);
+                    const cooldownUntil = rolesLevel.stage === 4
+                      ? rolesLevel.flipCooldownByColor.get(btn.color)
+                      : undefined;
+                    return (
+                      <ButtonDot
+                        key={btn.id}
+                        button={btn}
+                        position={getVisualPos(btn.x, btn.y, -1.85)}
+                        matchedBehaviorType={matched?.behaviorType}
+                        cooldownUntil={cooldownUntil}
+                      />
+                    );
+                  });
               }
               return null;
             })()}
@@ -1120,6 +1158,11 @@ export const GameScreen = ({
             {/* Roles level: confirmation tile (Monitor only) */}
             {currentLevel === "roles" && rolesLevel?.confirmationVisible && viewingRole === "MONITOR" && (
               <ConfirmationTile position={getVisualPos(rolesLevel.confirmationX, rolesLevel.confirmationY, -1.85)} />
+            )}
+
+            {/* Roles level: engineer switch tile (stage 4, Engineer only) */}
+            {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "ENGINEER" && (
+              <SwitchTile position={getVisualPos(rolesLevel.engineerSwitchX, rolesLevel.engineerSwitchY, -1.85)} />
             )}
 
             {/* Ping Effects */}
@@ -1163,7 +1206,7 @@ export const GameScreen = ({
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
 
-      {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} />}
+      {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} room={room} />}
 
       {/* Leave confirmation dialog */}
       {showLeaveConfirm && (
