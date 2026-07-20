@@ -1,0 +1,94 @@
+import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
+
+export type PlayerColor = "RED" | "GREEN" | "BLUE";
+export type PlayerRole = "OPERATOR" | "ENGINEER" | "MONITOR";
+
+export class Player extends Schema {
+  @type("number") x: number = 0;
+  @type("number") y: number = 0;
+  @type("string") color: PlayerColor = "RED";
+  @type("string") role: string = "";
+  @type("string") sessionId: string = "";
+  @type("string") name: string = "";
+  @type("string") school: string = "";
+  @type("string") discordName: string = "";
+}
+
+export class ButtonState extends Schema {
+  @type("string") id: string = "";
+  @type("string") color: string = "";
+  @type("number") x: number = 0;
+  @type("number") y: number = 0;
+  @type("string") behaviorType: string = "MOMENTARY";
+  @type("boolean") isActive: boolean = false;
+}
+
+export class PositionState extends Schema {
+  @type("number") x: number = 0;
+  @type("number") y: number = 0;
+}
+
+export class ConveyorState extends Schema {
+  @type("string") id: string = "";
+  @type("number") startX: number = 0;
+  @type("number") startY: number = 0;
+  @type("number") endX: number = 0;
+  @type("number") endY: number = 0;
+  @type("string") owner: PlayerRole = "OPERATOR";
+}
+
+export class MachineState extends Schema {
+  @type("string") id: string = "";
+  @type("string") machineType: string = "";
+  @type("number") order: number = 0;
+  @type("number") x: number = 0;
+  @type("number") y: number = 0;
+}
+
+export class RolesLevelState extends Schema {
+  @type("number") stage: number = 1;
+  @type("number") lights: number = 0;
+  @type("boolean") frozen: boolean = false;
+  @type({ map: ButtonState }) operatorButtons = new MapSchema<ButtonState>();
+  @type({ map: ButtonState }) engineerButtons = new MapSchema<ButtonState>();
+  @type("number") confirmationX: number = -1;
+  @type("number") confirmationY: number = -1;
+  @type("boolean") confirmationVisible: boolean = false;
+  @type("number") confirmationExpiresAt: number = 0;
+  @type("number") expiryCount: number = 0;
+  @type([PositionState]) operatorSlowTiles = new ArraySchema<PositionState>();
+  @type([PositionState]) engineerSlowTiles = new ArraySchema<PositionState>();
+  @type([PositionState]) monitorSlowTiles = new ArraySchema<PositionState>();
+  @type({ map: "number" }) slowedUntilBySession = new MapSchema<number>();
+  @type([ConveyorState]) conveyors = new ArraySchema<ConveyorState>();
+  @type([MachineState]) machines = new ArraySchema<MachineState>();
+  @type("number") itemX: number = 0;
+  @type("number") itemY: number = 0;
+  @type("number") processedCount: number = 0;
+  @type("string") itemState: string = "RAW_PART";
+  @type("string") statusMessage: string = "Route the raw part to the forming mill.";
+  @type("boolean") complete: boolean = false;
+}
+
+export class GameState extends Schema {
+  @type("number") gridWidth: number = 10;
+  @type("number") gridHeight: number = 8;
+
+  @type({ map: Player }) players = new MapSchema<Player>();
+
+  @type("boolean") gameStarted: boolean = false;
+
+  @type("number") countdown: number = 0;
+
+  @type("boolean") isGameOver: boolean = false;
+
+  @type("number") timeRemaining: number = 30 * 60; // 30 minutes in seconds
+
+  @type("number") stage: number = 1;
+
+  @type("number") seed: number = 0;
+
+  @type("string") currentLevel: string = "roles";
+
+  @type(RolesLevelState) rolesLevel = new RolesLevelState();
+}

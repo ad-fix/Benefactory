@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlas Arena — How It All Fits Together (ELI5)</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c2330; --line: #30363d;
+    --text: #e6edf3; --muted: #9aa6b2;
+    --platform: #58a6ff; --harness: #2dd4bf; --game: #7ee787;
+    --referee: #ffa657; --supa: #3fb950; --voice: #bc8cff; --ext: #f778ba;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 20px 80px; }
+  header h1 { font-size: 2rem; margin: 0 0 6px; }
+  header p.sub { color: var(--muted); margin: 0 0 24px; font-size: 1.05rem; }
+  .tabs { display: flex; gap: 10px; margin: 18px 0 30px; }
+  .tab {
+    flex: 1; padding: 14px 18px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text); font-size: 1rem; cursor: pointer; text-align: left;
+  }
+  .tab strong { display: block; font-size: 1.05rem; }
+  .tab span { color: var(--muted); font-size: 0.85rem; }
+  .tab.active { border-color: var(--platform); background: #11203a; }
+  section.level { display: none; }
+  section.level.active { display: block; }
+  h2 { font-size: 1.45rem; margin: 38px 0 10px; }
+  h3 { font-size: 1.12rem; margin: 28px 0 8px; }
+  p { margin: 10px 0; }
+  .muted { color: var(--muted); }
+  .figure {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; margin: 18px 0;
+  }
+  .figure figcaption { color: var(--muted); font-size: 0.88rem; margin-top: 10px; text-align: center; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 18px 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card h4 { margin: 0 0 6px; font-size: 1rem; }
+  .card p { margin: 6px 0; font-size: 0.93rem; }
+  .card.c-platform { border-left-color: var(--platform); }
+  .card.c-harness { border-left-color: var(--harness); }
+  .card.c-game { border-left-color: var(--game); }
+  .card.c-referee { border-left-color: var(--referee); }
+  .card.c-supa { border-left-color: var(--supa); }
+  .card.c-voice { border-left-color: var(--voice); }
+  code, .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 6px;
+    padding: 1px 6px; font-size: 0.86em; color: #d2e3ff;
+  }
+  .story { counter-reset: step; margin: 18px 0; }
+  .story .step {
+    display: flex; gap: 14px; align-items: flex-start; padding: 10px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .story .step:last-child { border-bottom: none; }
+  .story .step::before {
+    counter-increment: step; content: counter(step);
+    flex: 0 0 30px; height: 30px; border-radius: 50%; background: #11203a;
+    border: 1px solid var(--platform); color: var(--platform);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; margin-top: 2px;
+  }
+  .pill { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 1px 10px; font-size: 0.8rem; color: var(--muted); margin: 0 4px 4px 0; }
+  dl.glossary dt { font-weight: 700; margin-top: 14px; }
+  dl.glossary dd { margin: 2px 0 0 0; color: var(--muted); }
+  .callout {
+    background: #11203a; border: 1px solid var(--platform); border-radius: 12px;
+    padding: 12px 16px; margin: 16px 0; font-size: 0.95rem;
+  }
+  footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>🏟️ Atlas Arena: How It All Fits Together</h1>
+</header>
+
+<div class="tabs" role="tablist">
+  <button class="tab active" id="tab1" onclick="showLevel(1)">
+    <strong>Level 1 — The Big Picture</strong>
+    <span>The 2-minute, no-jargon version</span>
+  </button>
+  <button class="tab" id="tab2" onclick="showLevel(2)">
+    <strong>Level 2 — A Closer Look</strong>
+    <span>The real parts, names and all</span>
+  </button>
+</div>
+
+<!-- ================= LEVEL 1 ================= -->
+<section class="level active" id="level1">
+
+<h2>The big picture</h2>
+<p>Atlas Arena is four cooperating pieces: a <strong>website</strong> where you sign in and find teammates, a <strong>game</strong> that runs in your browser, a <strong>game server</strong> in the cloud that runs the actual match, and <strong>Supabase</strong> — the shared backend that stores everything and runs the small backend functions.</p>
+
+<figure class="figure">
+<svg viewBox="0 0 900 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Simple diagram: website, game, game server and Supabase">
+  <defs>
+    <marker id="aBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/></marker>
+    <marker id="aOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ffa657"/></marker>
+    <marker id="aGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3fb950"/></marker>
+  </defs>
+
+  <text x="165" y="52" fill="#9aa6b2" font-size="13" text-anchor="middle">you and 2 teammates start here ↓</text>
+
+  <!-- Website -->
+  <rect x="40" y="70" width="250" height="140" rx="14" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="165" y="106" font-size="26" text-anchor="middle">🖥️</text>
+  <text x="165" y="133" fill="#e6edf3" font-size="16" font-weight="700" text-anchor="middle">The Website</text>
+  <text x="165" y="152" fill="#9aa6b2" font-size="12" text-anchor="middle">(atlas-platform)</text>
+  <text x="165" y="174" fill="#9aa6b2" font-size="12.5" text-anchor="middle">Sign in · find teammates · see results</text>
+
+  <!-- Game -->
+  <rect x="610" y="70" width="250" height="140" rx="14" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="735" y="106" font-size="26" text-anchor="middle">🎮</text>
+  <text x="735" y="133" fill="#e6edf3" font-size="16" font-weight="700" text-anchor="middle">The Game</text>
+  <text x="735" y="152" fill="#9aa6b2" font-size="12" text-anchor="middle">(polar-winds-web, in your browser)</text>
+  <text x="735" y="174" fill="#9aa6b2" font-size="12.5" text-anchor="middle">Draws the game · sends your inputs</text>
+
+  <!-- Game server -->
+  <rect x="610" y="300" width="250" height="120" rx="14" fill="#161b22" stroke="#ffa657" stroke-width="1.5"/>
+  <text x="735" y="334" font-size="24" text-anchor="middle">⚙️</text>
+  <text x="735" y="360" fill="#e6edf3" font-size="16" font-weight="700" text-anchor="middle">The Game Server</text>
+  <text x="735" y="380" fill="#9aa6b2" font-size="12" text-anchor="middle">(Colyseus, in the cloud)</text>
+  <text x="735" y="400" fill="#9aa6b2" font-size="12.5" text-anchor="middle">Runs the real match · keeps score</text>
+
+  <!-- Supabase -->
+  <rect x="40" y="300" width="250" height="120" rx="14" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="165" y="334" font-size="24" text-anchor="middle">🗄️</text>
+  <text x="165" y="360" fill="#e6edf3" font-size="16" font-weight="700" text-anchor="middle">Supabase</text>
+  <text x="165" y="380" fill="#9aa6b2" font-size="12" text-anchor="middle">(database · logins · files · functions)</text>
+  <text x="165" y="400" fill="#9aa6b2" font-size="12.5" text-anchor="middle">Stores accounts, sessions, scores</text>
+
+  <!-- Arrows -->
+  <line x1="295" y1="140" x2="604" y2="140" stroke="#58a6ff" stroke-width="2" marker-end="url(#aBlue)"/>
+  <text x="450" y="124" fill="#58a6ff" font-size="13" font-weight="600" text-anchor="middle">① game token</text>
+  <text x="450" y="160" fill="#9aa6b2" font-size="11.5" text-anchor="middle">(proves who you are · expires in 60 s)</text>
+
+  <line x1="735" y1="215" x2="735" y2="294" stroke="#ffa657" stroke-width="2" marker-start="url(#aOrange)" marker-end="url(#aOrange)"/>
+  <text x="748" y="259" fill="#ffa657" font-size="12" text-anchor="start">every single move</text>
+
+  <line x1="604" y1="360" x2="296" y2="360" stroke="#ffa657" stroke-width="2" marker-end="url(#aOrange)"/>
+  <text x="450" y="345" fill="#ffa657" font-size="13" font-weight="600" text-anchor="middle">② final score + replay</text>
+
+  <line x1="165" y1="294" x2="165" y2="216" stroke="#3fb950" stroke-width="2" marker-end="url(#aGreen)"/>
+  <text x="178" y="250" fill="#3fb950" font-size="12.5" text-anchor="start">③ scores · rankings · reports</text>
+</svg>
+<figcaption>The website hands you to the game with a short-lived token; the game server runs the match and saves results to Supabase; the website reads them back.</figcaption>
+</figure>
+
+<h2>The four parts</h2>
+<div class="cards">
+  <div class="card c-platform">
+    <h4>🖥️ The website — atlas-platform</h4>
+    <p>This is <strong>atlasarena.com</strong>. You sign in, find two teammates, see when the next challenge starts, and check leaderboards and results. It never runs the game itself — its job is to get you into a match with the right credentials, then show you everything that came out of it.</p>
+  </div>
+  <div class="card c-game">
+    <h4>🎮 The game — polar-winds-web</h4>
+    <p><strong>Polar Winds</strong> runs in your browser. You and two teammates are RED, GREEN and BLUE, painting a grid, collecting items and avoiding enemies — with built-in voice chat. Your browser draws the game and sends your key presses; it doesn't decide what happens.</p>
+  </div>
+  <div class="card c-referee">
+    <h4>⚙️ The game server — the authority</h4>
+    <p>A program in the cloud that runs the <em>one real copy</em> of the match. Every key press from every player is sent to it; it decides what actually happens and sends the updated game state back to all three screens. One shared truth means nobody can cheat and everyone stays in sync.</p>
+  </div>
+  <div class="card c-supa">
+    <h4>🗄️ Supabase — the shared backend</h4>
+    <p>One cloud service holding the database (accounts, teams, every session and score), logins, and file storage (replays, audio). It also runs dozens of small backend functions: create game tokens, match players, compute rankings, send emails.</p>
+  </div>
+</div>
+
+<h2>One game, step by step</h2>
+<div class="story">
+  <div class="step"><div><strong>You sign in.</strong> The website checks your account with Supabase (email magic link or Discord).</div></div>
+  <div class="step"><div><strong>You find teammates.</strong> You press Play and a backend function puts you in a queue until 3 players are ready. Voice chat starts while you wait in the lobby.</div></div>
+  <div class="step"><div><strong>The website requests a game token.</strong> A backend function creates a signed token containing who you are and which match you're joining. It expires in 60 seconds, so it can't be stolen or reused.</div></div>
+  <div class="step"><div><strong>Your browser moves to the game's address</strong> and presents the token. The game verifies it with Supabase and lets you in.</div></div>
+  <div class="step"><div><strong>You play.</strong> For up to 30 minutes, every key press goes to the game server, which updates the one real copy of the game and sends the changes back to all three screens. Meanwhile a transcription service writes down what everyone says on voice chat.</div></div>
+  <div class="step"><div><strong>Game over.</strong> The game server saves your score and a full replay to Supabase. The voice transcripts are saved too.</div></div>
+  <div class="step"><div><strong>Back to the website.</strong> It shows your results and leaderboards — and later, a detailed report on how your team played and communicated.</div></div>
+</div>
+
+<div class="callout">💡 <strong>The big idea:</strong> the website and the game are two separate apps that never share a screen — your browser is handed from one to the other with a 60-second token, and both read and write the same Supabase backend. That's the whole architecture in one sentence.</div>
+
+</section>
+
+<!-- ================= LEVEL 2 ================= -->
+<section class="level" id="level2">
+<h2>The pieces, with real names</h2>
+<p>Three codebases do the work. <code>atlas-platform</code> is the website. <code>polar-winds-web</code> contains <em>both</em> the game's browser app (a thin “harness” shell plus the actual game visuals) <em>and</em> the authoritative game server. Everything durable lives in <strong>Supabase</strong> (database + auth + file storage + ~80 serverless “edge functions”), and <strong>LiveKit</strong> carries team voice.</p>
+
+<h3>🕹️ Harness vs. game code</h3>
+<p>Inside the game client, two layers are deliberately kept apart. The <strong>harness</strong> is everything <em>around</em> the gameplay: starting up, redeeming the token, talking to Supabase, matchmaking, voice, reconnecting, and returning to the platform. It doesn't know anything about how Polar Winds is played. The <strong>game code</strong> is only the gameplay: visuals, entities, input. Because the harness is game-agnostic, other games reuse the same pattern — new gameplay, same surrounding machinery.</p>
+
+<div class="cards">
+  <div class="card c-harness">
+    <h4>🧰 The harness — <span class="mono">polar-winds-web/client</span></h4>
+    <p><strong><code>Boot.tsx</code></strong> — the entry point. Reads <code>?token=…</code> from the URL, calls the <code>verify-game-token</code> edge function to redeem it, learns who you are and which Supabase environment (dev/stage/prod) to talk to, and asks for mic permission.</p>
+    <p><strong><code>Lobby.tsx</code> + <code>useGameLobby</code></strong> — matchmaking and the pre-game room: fetches the challenge seed (<code>get-polarwinds-seed</code>), joins the queue, gates the start on the challenge countdown.</p>
+    <p><strong><code>Index.tsx</code></strong> — the session manager: connects to the Colyseus room, funnels server state into React, handles disconnects with exponential-backoff reconnection, and when it's all over sends you back to the platform via the <code>returnUrl</code> (with the result attached as query params).</p>
+    <p><strong>Hooks</strong> — <code>usePlatformVoice</code> (LiveKit voice), <code>useCanvasVideoPublish</code> (publishes the game canvas for recording), session storage helpers.</p>
+  </div>
+  <div class="card c-game">
+    <h4>🎨 The game code — <span class="mono">client/src/screens</span></h4>
+    <p><strong><code>GameScreen.tsx</code></strong> — a Three.js / React Three Fiber canvas: top-down orthographic camera, bloom effects, the grid floor, and your keyboard/mouse input.</p>
+    <p><strong>Entities</strong> — <code>Player.tsx</code> (glowing RED/GREEN/BLUE cubes), <code>EnemyEntity.tsx</code>, 7 collectible types (network, box, equilibrium, clone, vantage, galaxy, polyomino) spawned by a config-driven <code>CollectibleFactory</code>.</p>
+    <p><strong>Crucially: no game rules live here.</strong> The client renders whatever state the server says is true and sends inputs up — which is exactly what makes the game cheat-proof and perfectly synced for all 3 players.</p>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card c-referee">
+    <h4>⚙️ The game server — <span class="mono">polar-winds-web/server</span></h4>
+    <p>A Node/Express + <strong>Colyseus</strong> app on Railway. <code>GameRoom.ts</code> owns the official <code>GameState</code> (players, grid colors, collectibles, enemies, scores, stage 1–8, 30-min clock, RNG seed), simulates moves and enemy AI, scores connected regions with BFS, and runs votes (clear board / abandon).</p>
+    <p>Colyseus auto-syncs state as tiny <em>diff patches</em> over WebSocket — clients get only what changed. Messages up: <code>move</code>, <code>ping</code>, dev commands. In solo mode, a bot fills the other two seats.</p>
+    <p>At game end it reports back to Supabase: <code>end-polarwinds-session</code> (final score + replay telemetry), <code>set-polarwinds-highscore</code> along the way, <code>set-polarwinds-milestone</code> for unlocks.</p>
+  </div>
+  <div class="card c-platform">
+    <h4>🖥️ The Platform — <span class="mono">atlas-platform</span></h4>
+    <p>React 18 + TypeScript + Vite + Tailwind, with React Router, Zustand and React Query. Auth is Supabase (magic-link email or Discord OAuth).</p>
+    <p>Pages: Dashboard, Play, Schedule, Challenge lobbies, Leaderboards, Profile, Performance (your skill report), and Admin tools. It also <em>hosts the source</em> of all the Supabase edge functions in <code>supabase/functions/</code>.</p>
+    <p>The launch moment lives in <code>GameEmbed.tsx</code>: call <code>generate-game-token</code> → receive a 60-second JWT + the game's URL → <code>window.location.href = gameUrl + "/boot?token=…"</code>. A full hand-off of the browser tab — no iframe — and the token carries everything the game needs (identity, mode, challenge, competition, team code, admin/dev flags).</p>
+  </div>
+  <div class="card c-voice">
+    <h4>🎙️ Voice &amp; transcription — LiveKit + <span class="mono">transcriber/</span></h4>
+    <p><strong>LiveKit Cloud</strong> hosts voice rooms for the lobby and the game (token minted by the <code>generate-livekit-token</code> edge function).</p>
+    <p>The <strong>transcriber</strong> is a LiveKit Agents worker (Node) that auto-joins each game room, runs every player's audio through Deepgram speech-to-text, uploads <code>{sessionId}/{color}.game.transcript.json</code> to Supabase storage, then calls <code>analyze-game-transcripts</code> to generate team-communication feedback shown on the Performance page.</p>
+  </div>
+  <div class="card c-supa">
+    <h4>🗄️ Supabase — one stack, three environments</h4>
+    <p>Three parallel projects — <strong>dev</strong>, <strong>stage</strong>, <strong>prod</strong> — each with: <strong>Auth</strong> (logins, JWTs), <strong>Postgres</strong> (users, teams, syndicates, sessions, challenge maps, matchmaking queue, skill scores…), <strong>Storage</strong> (replays, audio, transcripts, reports), and <strong>~80 edge functions</strong> (Deno) that hold nearly all backend logic. The game token tells every component which environment to use, so dev games never touch prod data.</p>
+  </div>
+</div>
+
+<h3>🗺️ The full map</h3>
+<figure class="figure">
+<svg viewBox="0 0 980 800" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Detailed architecture diagram">
+  <defs>
+    <marker id="bBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/></marker>
+    <marker id="bGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7ee787"/></marker>
+    <marker id="bOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ffa657"/></marker>
+    <marker id="bPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#bc8cff"/></marker>
+    <marker id="bSupa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3fb950"/></marker>
+  </defs>
+
+  <!-- Atlas Platform -->
+  <rect x="25" y="60" width="270" height="210" rx="14" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="160" y="90" fill="#58a6ff" font-size="15" font-weight="700" text-anchor="middle">🖥️ Atlas Platform</text>
+  <text x="160" y="108" fill="#9aa6b2" font-size="11" text-anchor="middle">the website · atlas-platform</text>
+  <text x="40" y="136" fill="#e6edf3" font-size="12">React 18 + Vite + Tailwind</text>
+  <text x="40" y="156" fill="#e6edf3" font-size="12">Supabase Auth: magic link / Discord</text>
+  <text x="40" y="176" fill="#e6edf3" font-size="12">Play · Lobbies · Leaderboards</text>
+  <text x="40" y="196" fill="#e6edf3" font-size="12">Performance · Schedule · Admin</text>
+  <text x="40" y="224" fill="#9aa6b2" font-size="11.5">GameEmbed.tsx: get 60s token,</text>
+  <text x="40" y="241" fill="#9aa6b2" font-size="11.5">redirect browser to the game ➜</text>
+
+  <!-- Game client -->
+  <rect x="345" y="40" width="300" height="250" rx="14" fill="#161b22" stroke="#7ee787" stroke-width="1.5"/>
+  <text x="495" y="66" fill="#7ee787" font-size="15" font-weight="700" text-anchor="middle">🎮 Polar Winds Client</text>
+  <text x="495" y="83" fill="#9aa6b2" font-size="11" text-anchor="middle">in the browser · polar-winds-web/client</text>
+  <rect x="362" y="95" width="266" height="95" rx="10" fill="#0d1117" stroke="#2dd4bf" stroke-width="1.3"/>
+  <text x="495" y="115" fill="#2dd4bf" font-size="12.5" font-weight="700" text-anchor="middle">Harness — game-agnostic shell</text>
+  <text x="376" y="135" fill="#e6edf3" font-size="11.5">Boot: redeem token · pick env</text>
+  <text x="376" y="152" fill="#e6edf3" font-size="11.5">Lobby: matchmaking · seed · countdown</text>
+  <text x="376" y="169" fill="#e6edf3" font-size="11.5">Colyseus client · reconnect · returnUrl</text>
+  <rect x="362" y="200" width="266" height="78" rx="10" fill="#0d1117" stroke="#7ee787" stroke-width="1.3"/>
+  <text x="495" y="220" fill="#7ee787" font-size="12.5" font-weight="700" text-anchor="middle">Game code — gameplay only</text>
+  <text x="376" y="240" fill="#e6edf3" font-size="11.5">Three.js / React Three Fiber canvas</text>
+  <text x="376" y="257" fill="#e6edf3" font-size="11.5">players · enemies · collectibles · input</text>
+
+  <!-- Colyseus server -->
+  <rect x="700" y="40" width="255" height="250" rx="14" fill="#161b22" stroke="#ffa657" stroke-width="1.5"/>
+  <text x="827" y="66" fill="#ffa657" font-size="15" font-weight="700" text-anchor="middle">⚙️ Game Server</text>
+  <text x="827" y="83" fill="#9aa6b2" font-size="11" text-anchor="middle">Colyseus on Railway · /server</text>
+  <text x="715" y="110" fill="#e6edf3" font-size="12">GameRoom: authoritative match</text>
+  <text x="715" y="130" fill="#e6edf3" font-size="12">GameState schema → diff patches</text>
+  <text x="715" y="150" fill="#e6edf3" font-size="12">moves · BFS scoring · enemy AI</text>
+  <text x="715" y="170" fill="#e6edf3" font-size="12">stages 1–8 · 30-min clock · votes</text>
+  <text x="715" y="190" fill="#e6edf3" font-size="12">bots fill seats in solo mode</text>
+  <text x="715" y="218" fill="#9aa6b2" font-size="11.5">on game end: file score, replay</text>
+  <text x="715" y="235" fill="#9aa6b2" font-size="11.5">&amp; milestones into Supabase</text>
+
+  <!-- LiveKit -->
+  <rect x="375" y="350" width="220" height="120" rx="14" fill="#161b22" stroke="#bc8cff" stroke-width="1.5"/>
+  <text x="485" y="378" fill="#bc8cff" font-size="14" font-weight="700" text-anchor="middle">🎙️ LiveKit Cloud</text>
+  <text x="485" y="400" fill="#e6edf3" font-size="11.5" text-anchor="middle">team voice rooms</text>
+  <text x="485" y="418" fill="#e6edf3" font-size="11.5" text-anchor="middle">(lobby + in-game)</text>
+  <text x="485" y="440" fill="#9aa6b2" font-size="11" text-anchor="middle">tokens via generate-livekit-token</text>
+
+  <!-- Transcriber -->
+  <rect x="640" y="350" width="240" height="120" rx="14" fill="#161b22" stroke="#bc8cff" stroke-width="1.5"/>
+  <text x="760" y="378" fill="#bc8cff" font-size="14" font-weight="700" text-anchor="middle">🤖 Transcriber Agent</text>
+  <text x="760" y="400" fill="#e6edf3" font-size="11.5" text-anchor="middle">LiveKit worker + Deepgram STT</text>
+  <text x="760" y="418" fill="#e6edf3" font-size="11.5" text-anchor="middle">per-player transcripts → storage</text>
+  <text x="760" y="440" fill="#9aa6b2" font-size="11" text-anchor="middle">then calls analyze-game-transcripts</text>
+
+  <!-- Supabase -->
+  <rect x="25" y="520" width="930" height="205" rx="14" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="45" y="550" fill="#3fb950" font-size="15" font-weight="700">🗄️ Supabase — database · auth · storage · functions</text>
+  <rect x="700" y="534" width="48" height="22" rx="11" fill="#0d1117" stroke="#30363d"/><text x="724" y="549" fill="#9aa6b2" font-size="11" text-anchor="middle">dev</text>
+  <rect x="756" y="534" width="56" height="22" rx="11" fill="#0d1117" stroke="#30363d"/><text x="784" y="549" fill="#9aa6b2" font-size="11" text-anchor="middle">stage</text>
+  <rect x="820" y="534" width="52" height="22" rx="11" fill="#0d1117" stroke="#3fb950"/><text x="846" y="549" fill="#3fb950" font-size="11" text-anchor="middle">prod</text>
+
+  <rect x="45" y="575" width="180" height="125" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <text x="135" y="600" fill="#e6edf3" font-size="12.5" font-weight="700" text-anchor="middle">Auth</text>
+  <text x="135" y="622" fill="#9aa6b2" font-size="11.5" text-anchor="middle">logins · JWTs</text>
+  <text x="135" y="640" fill="#9aa6b2" font-size="11.5" text-anchor="middle">magic link · Discord</text>
+
+  <rect x="245" y="575" width="240" height="125" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <text x="365" y="600" fill="#e6edf3" font-size="12.5" font-weight="700" text-anchor="middle">Postgres DB</text>
+  <text x="365" y="622" fill="#9aa6b2" font-size="11.5" text-anchor="middle">users · teams · syndicates</text>
+  <text x="365" y="640" fill="#9aa6b2" font-size="11.5" text-anchor="middle">sessions · challenge maps · queue</text>
+  <text x="365" y="658" fill="#9aa6b2" font-size="11.5" text-anchor="middle">rankings · 37-skill scores</text>
+
+  <rect x="505" y="575" width="180" height="125" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <text x="595" y="600" fill="#e6edf3" font-size="12.5" font-weight="700" text-anchor="middle">Storage</text>
+  <text x="595" y="622" fill="#9aa6b2" font-size="11.5" text-anchor="middle">replays · audio</text>
+  <text x="595" y="640" fill="#9aa6b2" font-size="11.5" text-anchor="middle">transcripts · reports</text>
+
+  <rect x="705" y="575" width="230" height="125" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <text x="820" y="600" fill="#e6edf3" font-size="12.5" font-weight="700" text-anchor="middle">~80 Edge Functions (Deno)</text>
+  <text x="820" y="622" fill="#9aa6b2" font-size="11.5" text-anchor="middle">tokens · sessions · matchmaking</text>
+  <text x="820" y="640" fill="#9aa6b2" font-size="11.5" text-anchor="middle">rankings (EloMMR) · payments</text>
+  <text x="820" y="658" fill="#9aa6b2" font-size="11.5" text-anchor="middle">skill engine (Claude) · email</text>
+
+  <!-- External chips -->
+  <text x="45" y="760" fill="#9aa6b2" font-size="11.5">edge functions call out to:</text>
+  <g font-size="11" text-anchor="middle">
+    <rect x="210" y="744" width="70" height="24" rx="12" fill="#161b22" stroke="#f778ba"/><text x="245" y="760" fill="#f778ba">Stripe</text>
+    <rect x="290" y="744" width="78" height="24" rx="12" fill="#161b22" stroke="#f778ba"/><text x="329" y="760" fill="#f778ba">Discord</text>
+    <rect x="378" y="744" width="86" height="24" rx="12" fill="#161b22" stroke="#f778ba"/><text x="421" y="760" fill="#f778ba">SendGrid</text>
+    <rect x="474" y="744" width="80" height="24" rx="12" fill="#161b22" stroke="#f778ba"/><text x="514" y="760" fill="#f778ba">PostHog</text>
+    <rect x="564" y="744" width="76" height="24" rx="12" fill="#161b22" stroke="#f778ba"/><text x="602" y="760" fill="#f778ba">OpenAI</text>
+    <rect x="650" y="744" width="92" height="24" rx="12" fill="#161b22" stroke="#f778ba"/><text x="696" y="760" fill="#f778ba">Anthropic</text>
+    <rect x="752" y="744" width="92" height="24" rx="12" fill="#161b22" stroke="#f778ba"/><text x="798" y="760" fill="#f778ba">Deepgram</text>
+  </g>
+  <line x1="820" y1="700" x2="820" y2="738" stroke="#f778ba" stroke-width="1.2" stroke-dasharray="3 3"/>
+
+  <!-- Arrows -->
+  <line x1="295" y1="150" x2="339" y2="150" stroke="#58a6ff" stroke-width="2" marker-end="url(#bBlue)"/>
+  <text x="318" y="136" fill="#58a6ff" font-size="11" font-weight="600" text-anchor="middle">hand-off</text>
+  <text x="318" y="170" fill="#9aa6b2" font-size="10" text-anchor="middle">60s JWT</text>
+
+  <line x1="645" y1="165" x2="694" y2="165" stroke="#ffa657" stroke-width="2" marker-start="url(#bOrange)" marker-end="url(#bOrange)"/>
+  <text x="670" y="148" fill="#ffa657" font-size="10.5" text-anchor="middle">WebSocket</text>
+  <text x="670" y="185" fill="#9aa6b2" font-size="10" text-anchor="middle">inputs ↑</text>
+  <text x="670" y="198" fill="#9aa6b2" font-size="10" text-anchor="middle">patches ↓</text>
+
+  <line x1="160" y1="270" x2="160" y2="514" stroke="#58a6ff" stroke-width="2" marker-end="url(#bBlue)"/>
+  <text x="172" y="350" fill="#9aa6b2" font-size="11">HTTPS: sign-in, edge calls,</text>
+  <text x="172" y="366" fill="#9aa6b2" font-size="11">leaderboards &amp; reports</text>
+
+  <line x1="355" y1="290" x2="355" y2="514" stroke="#7ee787" stroke-width="2" marker-end="url(#bGreen)"/>
+  <text x="345" y="500" fill="#9aa6b2" font-size="11" text-anchor="end">verify token · seed · session</text>
+
+  <line x1="485" y1="290" x2="485" y2="344" stroke="#bc8cff" stroke-width="2" marker-start="url(#bPurple)" marker-end="url(#bPurple)"/>
+  <text x="497" y="322" fill="#9aa6b2" font-size="10.5">voice</text>
+
+  <line x1="640" y1="410" x2="601" y2="410" stroke="#bc8cff" stroke-width="2" marker-end="url(#bPurple)"/>
+  <text x="621" y="396" fill="#9aa6b2" font-size="10" text-anchor="middle">listens</text>
+
+  <line x1="940" y1="290" x2="940" y2="514" stroke="#ffa657" stroke-width="2" marker-end="url(#bOrange)"/>
+  <text x="930" y="340" fill="#9aa6b2" font-size="11" text-anchor="end">game end: score,</text>
+  <text x="930" y="356" fill="#9aa6b2" font-size="11" text-anchor="end">replay, milestones</text>
+
+  <line x1="760" y1="470" x2="760" y2="514" stroke="#bc8cff" stroke-width="2" marker-end="url(#bPurple)"/>
+  <text x="772" y="498" fill="#9aa6b2" font-size="10.5">transcripts</text>
+</svg>
+<figcaption>The full map. Blue = website traffic, green = game client traffic, orange = the authoritative game server, purple = voice/AI pipeline, all converging on Supabase.</figcaption>
+</figure>
+<h3>🎬 One game, the technical play-by-play</h3>
+<p>Here's the exact sequence when three players run a live challenge — who calls whom, in order:</p>
+
+<figure class="figure">
+<svg viewBox="0 0 980 770" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sequence diagram of one game session">
+  <defs>
+    <marker id="sBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/></marker>
+    <marker id="sGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7ee787"/></marker>
+    <marker id="sOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ffa657"/></marker>
+    <marker id="sPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#bc8cff"/></marker>
+  </defs>
+
+  <!-- lifelines -->
+  <g stroke="#30363d" stroke-dasharray="4 5" stroke-width="1">
+    <line x1="110" y1="66" x2="110" y2="740"/>
+    <line x1="330" y1="66" x2="330" y2="740"/>
+    <line x1="560" y1="66" x2="560" y2="740"/>
+    <line x1="760" y1="66" x2="760" y2="740"/>
+    <line x1="900" y1="66" x2="900" y2="740"/>
+  </g>
+
+  <!-- headers -->
+  <g>
+    <rect x="40" y="24" width="140" height="40" rx="10" fill="#161b22" stroke="#58a6ff" stroke-width="1.4"/>
+    <text x="110" y="49" fill="#58a6ff" font-size="12.5" font-weight="700" text-anchor="middle">🖥️ Platform</text>
+    <rect x="260" y="24" width="140" height="40" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.4"/>
+    <text x="330" y="49" fill="#3fb950" font-size="12.5" font-weight="700" text-anchor="middle">🗄️ Supabase</text>
+    <rect x="490" y="24" width="140" height="40" rx="10" fill="#161b22" stroke="#7ee787" stroke-width="1.4"/>
+    <text x="560" y="49" fill="#7ee787" font-size="12.5" font-weight="700" text-anchor="middle">🎮 Game client</text>
+    <rect x="690" y="24" width="140" height="40" rx="10" fill="#161b22" stroke="#ffa657" stroke-width="1.4"/>
+    <text x="760" y="49" fill="#ffa657" font-size="12.5" font-weight="700" text-anchor="middle">⚙️ Game server</text>
+    <rect x="843" y="24" width="114" height="40" rx="10" fill="#161b22" stroke="#bc8cff" stroke-width="1.4"/>
+    <text x="900" y="43" fill="#bc8cff" font-size="11.5" font-weight="700" text-anchor="middle">🎙️ Voice +</text>
+    <text x="900" y="57" fill="#bc8cff" font-size="11.5" font-weight="700" text-anchor="middle">transcriber</text>
+  </g>
+
+  <!-- steps -->
+  <g font-size="11.5">
+    <line x1="110" y1="105" x2="324" y2="105" stroke="#58a6ff" stroke-width="1.8" marker-end="url(#sBlue)"/>
+    <text x="220" y="92" fill="#e6edf3" text-anchor="middle">1 · sign in (Auth: magic link / Discord)</text>
+
+    <line x1="110" y1="150" x2="324" y2="150" stroke="#58a6ff" stroke-width="1.8" marker-end="url(#sBlue)"/>
+    <text x="220" y="137" fill="#e6edf3" text-anchor="middle">2 · join-matchmaking ⟳ until 3 players ready</text>
+
+    <line x1="110" y1="195" x2="324" y2="195" stroke="#58a6ff" stroke-width="1.8" marker-end="url(#sBlue)"/>
+    <text x="220" y="182" fill="#e6edf3" text-anchor="middle">3 · generate-game-token → 60s JWT</text>
+
+    <line x1="110" y1="240" x2="554" y2="240" stroke="#58a6ff" stroke-width="1.8" marker-end="url(#sBlue)"/>
+    <text x="330" y="227" fill="#e6edf3" text-anchor="middle">4 · browser redirect: gameUrl/boot?token=…</text>
+
+    <line x1="560" y1="285" x2="336" y2="285" stroke="#7ee787" stroke-width="1.8" marker-end="url(#sGreen)"/>
+    <text x="448" y="272" fill="#e6edf3" text-anchor="middle">5 · verify-game-token · get-polarwinds-seed</text>
+
+    <line x1="560" y1="330" x2="754" y2="330" stroke="#7ee787" stroke-width="1.8" marker-end="url(#sGreen)"/>
+    <text x="660" y="317" fill="#e6edf3" text-anchor="middle">6 · join GameRoom (WebSocket)</text>
+
+    <line x1="560" y1="375" x2="894" y2="375" stroke="#7ee787" stroke-width="1.8" marker-end="url(#sGreen)"/>
+    <text x="727" y="362" fill="#e6edf3" text-anchor="middle">7 · connect team voice room</text>
+
+    <!-- gameplay loop -->
+    <rect x="475" y="400" width="480" height="92" rx="10" fill="none" stroke="#ffa657" stroke-dasharray="5 4" stroke-width="1.2"/>
+    <text x="490" y="418" fill="#ffa657" font-size="10.5">⟳ for up to 30 minutes, stages 1–8</text>
+    <line x1="560" y1="440" x2="754" y2="440" stroke="#7ee787" stroke-width="1.8" marker-end="url(#sGreen)"/>
+    <text x="660" y="432" fill="#9aa6b2" font-size="10.5" text-anchor="middle">8 · inputs: move · ping</text>
+    <line x1="760" y1="472" x2="566" y2="472" stroke="#ffa657" stroke-width="1.8" marker-end="url(#sOrange)"/>
+    <text x="660" y="464" fill="#9aa6b2" font-size="10.5" text-anchor="middle">state diff patches: grid · scores · stage</text>
+
+    <line x1="760" y1="530" x2="336" y2="530" stroke="#ffa657" stroke-width="1.8" marker-end="url(#sOrange)"/>
+    <text x="548" y="517" fill="#e6edf3" text-anchor="middle">9 · game over: end-polarwinds-session (score + replay) · milestones</text>
+
+    <line x1="900" y1="575" x2="336" y2="575" stroke="#bc8cff" stroke-width="1.8" marker-end="url(#sPurple)"/>
+    <text x="618" y="562" fill="#e6edf3" text-anchor="middle">10 · upload transcripts → analyze-game-transcripts</text>
+
+    <line x1="560" y1="620" x2="116" y2="620" stroke="#7ee787" stroke-width="1.8" marker-end="url(#sGreen)"/>
+    <text x="338" y="607" fill="#e6edf3" text-anchor="middle">11 · returnUrl → back to the website with results</text>
+
+    <!-- aftermath note -->
+    <rect x="170" y="645" width="500" height="64" rx="10" fill="#0d1117" stroke="#3fb950" stroke-width="1.2"/>
+    <text x="186" y="665" fill="#3fb950" font-size="11" font-weight="700">12 · later, inside Supabase:</text>
+    <text x="186" y="682" fill="#9aa6b2" font-size="10.5">process-session (normalize) → calculate-rankings (EloMMR)</text>
+    <text x="186" y="698" fill="#9aa6b2" font-size="10.5">→ assess-session (skill engine, Claude) → generate-report (email)</text>
+
+    <line x1="110" y1="730" x2="324" y2="730" stroke="#58a6ff" stroke-width="1.8" marker-end="url(#sBlue)"/>
+    <text x="220" y="722" fill="#e6edf3" text-anchor="middle">13 · read leaderboards &amp; Performance</text>
+  </g>
+</svg>
+<figcaption>One live challenge from sign-in to skill report. Steps 1–3 happen on the website, 4–11 in the game, 12–13 back on the website.</figcaption>
+</figure>
+
+<h3>🏆 After the game: the score pipeline</h3>
+<p>A raw score isn't the end of the story. Once the game server files the session, a chain of edge functions turns it into meaning: <code>process-session</code> normalizes scores so different challenges are comparable; <code>calculate-rankings</code> updates every player's <strong>EloMMR</strong> rating for the leaderboards; and the <strong>Atlas Skill Engine</strong> (<code>assess-session</code>) replays the telemetry and reads the voice transcripts, runs them through Claude, and writes <strong>37 skill scores</strong> per player across 6 categories — which <code>generate-report</code> can render into an emailable report. That's what the Performance page on the platform displays.</p>
+
+<h3>🧭 Who lives where</h3>
+<div class="cards">
+  <div class="card c-platform">
+    <h4>Repos → running things</h4>
+    <p><code>atlas-platform</code> → the website (static React app) <em>plus</em> the source of all Supabase edge functions (<code>supabase/functions/</code>).</p>
+    <p><code>polar-winds-web</code> → one repo, three deployables: the game client (served from the game URL), the Colyseus server (Railway, same domain via WebSocket), and the transcriber worker (LiveKit Agents).</p>
+  </div>
+  <div class="card c-supa">
+    <h4>Three environments, one switch</h4>
+    <p>dev / stage / prod are three separate Supabase projects. The game token says which one to use, so the harness, game server and transcriber all aim at the same environment for a given session — dev games can never scribble on prod data.</p>
+    <p class="muted">The same platform → token → harness pattern powers the other games on the platform too.</p>
+  </div>
+</div>
+
+<h3>📖 Tiny glossary</h3>
+<dl class="glossary">
+  <dt>Colyseus</dt><dd>A multiplayer game-server framework for Node.js. You define a “room” with typed state; it syncs that state to all connected players automatically, sending only what changed (diff patches).</dd>
+  <dt>Edge function</dt><dd>A small serverless function (here: Deno scripts hosted by Supabase) that runs one job on demand — “print a token”, “end a session”, “compute rankings”. The project has ~80 of them; they are the entire backend API.</dd>
+  <dt>JWT (the game token)</dt><dd>A signed token that can't be forged. The 60-second game token carries your identity and the game config (mode, challenge, competition, team code, dev/admin flags) across the website → game hand-off.</dd>
+  <dt>Supabase</dt><dd>Postgres database + auth + file storage + edge functions, as one hosted service. The single source of truth for everything durable.</dd>
+  <dt>LiveKit</dt><dd>Hosted real-time audio/video (WebRTC). Powers team voice chat, and its “Agents” framework runs the transcriber bot that joins each game as a silent listener.</dd>
+  <dt>EloMMR</dt><dd>A rating system (chess-Elo style) that updates each player's skill rating from normalized session scores; feeds the leaderboards.</dd>
+  <dt>Replay / telemetry</dt><dd>The event-by-event record of a session the game server uploads at the end — what the skill engine later “re-watches” to score 37 skills.</dd>
+  <dt>React Three Fiber</dt><dd>React bindings for Three.js (WebGL 3D). The game's visuals are React components that render into a 3D canvas.</dd>
+  <dt>Railway</dt><dd>The cloud host the game (client + Colyseus server) is deployed on; the platform reaches it via one URL (<code>VITE_GAME_URL</code>).</dd>
+</dl>
+
+<div class="callout">💡 <strong>The design in one sentence:</strong> a thin website and a thin game client, an authoritative game server in between, and one Supabase backend per environment that every piece reads and writes through ~80 small, single-purpose functions.</div>
+</section>
+
+<footer>
+  Generated June 2026 from the <code>atlas-platform</code> and <code>polar-winds-web</code> repos in the Nexus workspace. Toggle the tabs above for the simple or detailed version.
+</footer>
+
+</div>
+<script>
+function showLevel(n) {
+  document.getElementById('level1').classList.toggle('active', n === 1);
+  document.getElementById('level2').classList.toggle('active', n === 2);
+  document.getElementById('tab1').classList.toggle('active', n === 1);
+  document.getElementById('tab2').classList.toggle('active', n === 2);
+  window.scrollTo({ top: 0 });
+}
+</script>
+</body>
+</html>
