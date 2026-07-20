@@ -18,6 +18,10 @@ import { Info, LogOut, Settings, TriangleAlert, Volume2, VolumeX, X } from "luci
 import { cn } from "@/lib/utils";
 import { useSounds } from "@/hooks/use-sounds";
 // Removed: PolarAmbientParticlesCanvas, NoiseBlobFieldCanvas — hidden behind opaque R3F canvas, wasted WebGL contexts
+import { InteractablePopup } from "@/components/game/InteractablePopup";
+// adding interactable objects depending on level and stage
+import { InteractableItem } from "@/components/game/InteractableItem";
+import { LEVEL_INTERACTABLES } from "@/constants/levelInteractables";
 import { HudCornerLs, POLAR_HUD } from "@/components/ui/polar-chrome";
 import { NoiseFieldOverlay, type NoiseFieldHandle } from "@/components/game/NoiseFieldOverlay";
 import { StageAnnouncement } from "@/components/game/StageAnnouncement";
@@ -341,6 +345,13 @@ export const GameScreen = ({
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
   useAmbientMusic(LEVEL_MUSIC[currentLevel] ?? DEFAULT_LEVEL_MUSIC);
+  const [activePopup, setActivePopup] = useState<{ imageUrl: string; label: string; triggerId: number } | null>(null);
+const popupCounter = useRef(0);
+
+const showPopup = (imageUrl: string, label: string) => {
+  popupCounter.current += 1;
+  setActivePopup({ imageUrl, label, triggerId: popupCounter.current });
+};
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsExiting, setSettingsExiting] = useState(false);
@@ -1078,6 +1089,15 @@ export const GameScreen = ({
         <pointLight position={[-10, -10, -10]} intensity={0.5} color={getFloorTint("GREEN")} />
         < Level1Mesh /> 
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
+        
+           {(LEVEL_INTERACTABLES[currentLevel]?.[stage] ?? []).map((item) => (
+              <InteractableItem
+                key={item.id}
+                imageUrl={item.imageUrl}
+                position={getVisualPos(item.gridX, item.gridY, 0)}
+                onInteract={() => showPopup(item.imageUrl, item.label)}
+              />
+            ))}
 
             {/* Players */}
             {Array.from(players.values()).map((player, index) => {
@@ -1208,6 +1228,15 @@ export const GameScreen = ({
       <NoiseFieldOverlay ref={noiseFieldRef} resolutionScale={0.8} />
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
+
+         {activePopup && (              
+        <InteractablePopup
+          key={activePopup.triggerId}
+          imageUrl={activePopup.imageUrl}
+          label={activePopup.label}
+          onClose={() => setActivePopup(null)}
+        />
+      )}
 
       {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} room={room} />}
 
