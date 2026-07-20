@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrthographicCamera } from "@react-three/drei";
@@ -17,11 +17,16 @@ import { useSounds } from "@/hooks/use-sounds";
 import { HudCornerLs, POLAR_HUD } from "@/components/ui/polar-chrome";
 import { NoiseFieldOverlay, type NoiseFieldHandle } from "@/components/game/NoiseFieldOverlay";
 import { StageAnnouncement } from "@/components/game/StageAnnouncement";
+import { DevStageControls } from "@/components/game/DevStageControls";
 import { GameControls } from "@/components/game/GameControls";
 import { NebulaBackdrop } from "@/components/game/NebulaBackdrop";
 import { RolesLevelView } from "@/levels/roles/RolesLevelView";
 import { ButtonDot } from "@/levels/roles/ButtonDot";
 import { ConfirmationTile } from "@/levels/roles/ConfirmationTile";
+import { SwitchTile } from "@/levels/roles/SwitchTile";
+import { StageLights } from "@/levels/roles/StageLights";
+import { OperatorGhost } from "@/levels/roles/OperatorGhost";
+import { GhostButton } from "@/levels/roles/GhostButton";
 import {
   getFloorTint,
   getPlayerDisplayLabel,
@@ -51,6 +56,7 @@ interface ButtonLocal {
   y: number;
   behaviorType: string;
   isActive: boolean;
+  relocateAt: number;
 }
 
 interface RolesLevelLocal {
@@ -65,6 +71,10 @@ interface RolesLevelLocal {
   confirmationExpiresAt: number;
   expiryCount: number;
   slowedUntilBySession: Map<string, number>;
+  hiddenEngineerColor: string;
+  engineerSwitchX: number;
+  engineerSwitchY: number;
+  flipCooldownByColor: Map<string, number>;
 }
 
 interface Ping {
@@ -215,6 +225,8 @@ interface GameScreenProps {
   isSoloMode: boolean;
   stage: number;
   timeRemaining: number;
+  isDevMode: boolean;
+  seed: number;
   isSpectator?: boolean;
   isGameOver?: boolean;
   countdown?: number;
@@ -311,6 +323,9 @@ export const GameScreen = ({
   currentLevel = "roles",
   isSoloMode,
   stage,
+  timeRemaining,
+  isDevMode,
+  seed,
   isSpectator = false,
   isGameOver = false,
   countdown = 0,
@@ -360,7 +375,16 @@ export const GameScreen = ({
   // Noise field overlay ref (flashes on stage change)
   const noiseFieldRef = useRef<NoiseFieldHandle>(null);
 
-  const effectiveStage = stage;
+  // Dev: client-side stage override for effects testing (does NOT affect game)
+  const [fakeStage, setFakeStage] = useState<number | null>(null);
+  const effectiveStage = fakeStage ?? stage;
+
+  const localPlayerDisplayName = useMemo(() => {
+    if (!room) return null;
+    const me = Array.from(players.values()).find((p) => p.sessionId === room.sessionId);
+    const n = me?.name?.trim();
+    return n && n.length > 0 ? n : null;
+  }, [room, players]);
 
   useEffect(() => {
     return () => {
@@ -424,6 +448,13 @@ export const GameScreen = ({
     }
   }, [effectiveStage]);
 
+  // Log seed in dev mode
+  useEffect(() => {
+    if (isDevMode && seed) {
+      console.log(`[Dev Mode] Seed: ${seed}`);
+    }
+  }, [isDevMode, seed]);
+
   // Initialize predicted position when we know our player
   useEffect(() => {
     if (players.size > 0 && !predictedPos) {
@@ -479,6 +510,21 @@ export const GameScreen = ({
           pendingInputsRef.current.clear();
           setPredictedPos({ x: newPlayer.x, y: newPlayer.y });
           setActivePlayerIndex(newIndex);
+        }
+        return;
+      }
+
+      // Dev mode: 1/2/3 to switch to red/green/blue player
+      if (isDevMode && isSoloMode && (e.key === "1" || e.key === "2" || e.key === "3")) {
+        const colorMap: Record<string, PlayerColor> = { "1": "RED", "2": "GREEN", "3": "BLUE" };
+        const targetColor = colorMap[e.key];
+        const playerArray = Array.from(players.values());
+        const targetIndex = playerArray.findIndex(p => p.color === targetColor);
+        if (targetIndex !== -1 && targetIndex !== activePlayerIndex) {
+          const newPlayer = playerArray[targetIndex];
+          pendingInputsRef.current.clear();
+          setPredictedPos({ x: newPlayer.x, y: newPlayer.y });
+          setActivePlayerIndex(targetIndex);
         }
         return;
       }
@@ -554,7 +600,7 @@ export const GameScreen = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [room, myColor, isSoloMode, activePlayerIndex, players, gridWidth, gridHeight, predictedPos, isSpectator, countdown, isGameOver]);
+  }, [room, myColor, isSoloMode, activePlayerIndex, players, gridWidth, gridHeight, predictedPos, isDevMode, isSpectator, countdown, isGameOver]);
 
   // Role of the player currently controlling/viewing (solo: active player; multiplayer: own role)
   const viewingRole = isSoloMode
@@ -597,14 +643,7 @@ export const GameScreen = ({
            hidden behind opaque R3F Canvas (z-[1]), wasted WebGL contexts.
            NoiseFieldOverlay + ScoreBurstOverlay moved AFTER the R3F Canvas below. */}
       {/* HUD: frosted polar chrome (match timer / stage chips); settings swap into same shell */}
-      <div
-        className={cn(
-          "absolute left-4 top-4 z-20 flex flex-col gap-2",
-          currentLevel === "roles" && !isSoloMode
-            ? "w-[min(26rem,48vw)]"
-            : "w-[min(11.5rem,calc(100vw-2rem))]",
-        )}
-      >
+      <div className="absolute left-4 top-4 z-20 flex w-[min(11.5rem,calc(100vw-2rem))] flex-col gap-2">
         <div
           className="relative flex flex-col overflow-hidden rounded-none border border-solid bg-canvas/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px]"
           style={{ borderColor: POLAR_HUD.border }}
@@ -806,7 +845,7 @@ export const GameScreen = ({
               </div>
             </>
           ) : (
-            <div className="relative z-10 grid w-full shrink-0 grid-cols-2 items-center gap-3 px-3 py-2.5 sm:grid-cols-[auto_auto_minmax(5rem,1fr)_auto] sm:gap-4">
+            <div className="relative z-10 flex w-full shrink-0 flex-col gap-3 px-3 py-3">
               <div className="grid min-w-0 gap-1">
                 <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
                   Mode
@@ -823,6 +862,17 @@ export const GameScreen = ({
                   </p>
                 </div>
               )}
+              <div className="grid min-w-0 gap-1">
+                <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                  You
+                </p>
+                <p
+                  className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200"
+                  style={{ color: myColor ? getPlayerUiLabelHex(myColor) : undefined }}
+                >
+                  {localPlayerDisplayName ?? (myColor ? getPlayerDisplayLabel(myColor) : "…")}
+                </p>
+              </div>
               {myRole && (
                 <div className="grid min-w-0 gap-1">
                   <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
@@ -833,7 +883,7 @@ export const GameScreen = ({
                   </p>
                 </div>
               )}
-              <div className="flex w-auto shrink-0 justify-end gap-0.5 border-l border-white/10 pl-2">
+              <div className="flex w-full shrink-0 justify-end gap-0.5 border-t border-white/10 pt-2">
                 <button
                   type="button"
                   onClick={() => setControlsOpen(v => !v)}
@@ -879,7 +929,7 @@ export const GameScreen = ({
       </div>
 
       {/* Stage Display - Top Center (polar blue chrome) */}
-      <div className={cn("absolute left-1/2 top-4 z-10 -translate-x-1/2", currentLevel === "roles" && "hidden")}>
+      <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2">
         {/* Outer glow — intensity scales with stage */}
         <div
           className="absolute -inset-3 rounded-sm"
@@ -911,6 +961,8 @@ export const GameScreen = ({
         </div>
       </div>
 
+      {currentLevel === "roles" && <StageLights lights={rolesLevel?.lights ?? 0} />}
+
       {currentLevel === "roles" && (rolesLevel?.expiryCount ?? 0) > 0 && (
         <div
           key={rolesLevel!.expiryCount}
@@ -937,12 +989,51 @@ export const GameScreen = ({
         </div>
       )}
 
+      {/* Timer Display - Bottom Center (polar blue chrome) */}
+      <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
+        <div
+          className="relative min-w-[7.25rem] whitespace-nowrap rounded-none border border-solid bg-canvas/50 px-4 py-2.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px]"
+          style={{ borderColor: POLAR_HUD.border }}
+          data-ui="game-timer-chip"
+        >
+          <HudCornerLs />
+          <div className="relative z-[1]">
+            <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">Time</p>
+            <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">Remaining</p>
+            <p className="mt-1 font-montreal text-3xl font-bold leading-none tracking-[-0.04em] text-white">
+              {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, "0")}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Spectator Badge */}
       {isSpectator && (
         <div className="absolute left-1/2 top-4 z-50 -translate-x-1/2 rounded-none border border-hairline/40 bg-canvas/45 px-4 py-2 font-montreal text-[11px] uppercase tracking-wider text-slate-400 backdrop-blur-[6px]">
           Spectating
         </div>
       )}
+
+      {/* Dev Mode Panel - Bottom Right */}
+      {isDevMode && (
+        <div className="absolute bottom-8 right-8 z-10 flex flex-col items-end gap-2">
+          <div className="rounded-none border border-yellow-500/25 bg-canvas/45 px-3 py-1.5 backdrop-blur-[6px]">
+            <p className="text-xs font-mono text-yellow-300/80">Seed: {seed}</p>
+          </div>
+          <button
+            onClick={() => {
+              if (room) {
+                room.send("devStageUp", {});
+              }
+            }}
+            className="rounded-none border border-yellow-500/35 bg-yellow-950/50 px-4 py-2 font-montreal text-xs uppercase tracking-wider backdrop-blur-[6px] transition-colors hover:border-yellow-400/50 hover:bg-yellow-950/70"
+          >
+            <p className="text-sm font-bold text-yellow-300">Stage Up</p>
+            <p className="text-xs text-yellow-300/60 mt-0.5">Dev Mode</p>
+          </button>
+        </div>
+      )}
+
 
       {/* Main Game Canvas */}
       <CanvasErrorBoundary>
@@ -1011,6 +1102,30 @@ export const GameScreen = ({
               );
             })}
 
+            {/* Roles level: Monitor-only Operator onion-skin ghost (stage 4) */}
+            {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" && (() => {
+              const operatorPlayer = Array.from(players.values()).find(p => p.role === "OPERATOR");
+              if (!operatorPlayer) return null;
+              return (
+                <OperatorGhost
+                  color={COLOR_MAP_LOWER[operatorPlayer.color]}
+                  position={getVisualPos(operatorPlayer.x, operatorPlayer.y, -1.5)}
+                />
+              );
+            })()}
+
+            {/* Roles level: Monitor-only ghost buttons + relocation countdown (stage 4) */}
+            {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" &&
+              rolesLevel.operatorButtons.map(btn => (
+                <GhostButton
+                  key={btn.id}
+                  color={btn.color}
+                  position={getVisualPos(btn.x, btn.y, -1.85)}
+                  relocateAt={btn.relocateAt}
+                />
+              ))
+            }
+
             {/* Roles level: buttons (role-gated) */}
             {currentLevel === "roles" && rolesLevel && (() => {
               if (viewingRole === "OPERATOR") {
@@ -1019,17 +1134,23 @@ export const GameScreen = ({
                 ));
               }
               if (viewingRole === "ENGINEER") {
-                return rolesLevel.engineerButtons.map(btn => {
-                  const matched = rolesLevel.operatorButtons.find(ob => ob.color === btn.color);
-                  return (
-                    <ButtonDot
-                      key={btn.id}
-                      button={btn}
-                      position={getVisualPos(btn.x, btn.y, -1.85)}
-                      matchedBehaviorType={matched?.behaviorType}
-                    />
-                  );
-                });
+                return rolesLevel.engineerButtons
+                  .filter(btn => !(rolesLevel.stage === 4 && btn.color === rolesLevel.hiddenEngineerColor))
+                  .map(btn => {
+                    const matched = rolesLevel.operatorButtons.find(ob => ob.color === btn.color);
+                    const cooldownUntil = rolesLevel.stage === 4
+                      ? rolesLevel.flipCooldownByColor.get(btn.color)
+                      : undefined;
+                    return (
+                      <ButtonDot
+                        key={btn.id}
+                        button={btn}
+                        position={getVisualPos(btn.x, btn.y, -1.85)}
+                        matchedBehaviorType={matched?.behaviorType}
+                        cooldownUntil={cooldownUntil}
+                      />
+                    );
+                  });
               }
               return null;
             })()}
@@ -1037,6 +1158,11 @@ export const GameScreen = ({
             {/* Roles level: confirmation tile (Monitor only) */}
             {currentLevel === "roles" && rolesLevel?.confirmationVisible && viewingRole === "MONITOR" && (
               <ConfirmationTile position={getVisualPos(rolesLevel.confirmationX, rolesLevel.confirmationY, -1.85)} />
+            )}
+
+            {/* Roles level: engineer switch tile (stage 4, Engineer only) */}
+            {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "ENGINEER" && (
+              <SwitchTile position={getVisualPos(rolesLevel.engineerSwitchX, rolesLevel.engineerSwitchY, -1.85)} />
             )}
 
             {/* Ping Effects */}
@@ -1078,8 +1204,9 @@ export const GameScreen = ({
       {/* Overlays — AFTER R3F Canvas, no wrapper divs, canvases use mix-blend-mode:screen */}
       <NoiseFieldOverlay ref={noiseFieldRef} resolutionScale={0.8} />
       <StageAnnouncement stage={effectiveStage} />
+      <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
 
-      {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} />}
+      {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} room={room} />}
 
       {/* Leave confirmation dialog */}
       {showLeaveConfirm && (

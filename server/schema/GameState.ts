@@ -21,26 +21,10 @@ export class ButtonState extends Schema {
   @type("number") y: number = 0;
   @type("string") behaviorType: string = "MOMENTARY";
   @type("boolean") isActive: boolean = false;
+  @type("number") relocateAt: number = 0;
 }
 
 export class PositionState extends Schema {
-  @type("number") x: number = 0;
-  @type("number") y: number = 0;
-}
-
-export class ConveyorState extends Schema {
-  @type("string") id: string = "";
-  @type("number") startX: number = 0;
-  @type("number") startY: number = 0;
-  @type("number") endX: number = 0;
-  @type("number") endY: number = 0;
-  @type("string") owner: PlayerRole = "OPERATOR";
-}
-
-export class MachineState extends Schema {
-  @type("string") id: string = "";
-  @type("string") machineType: string = "";
-  @type("number") order: number = 0;
   @type("number") x: number = 0;
   @type("number") y: number = 0;
 }
@@ -60,14 +44,10 @@ export class RolesLevelState extends Schema {
   @type([PositionState]) engineerSlowTiles = new ArraySchema<PositionState>();
   @type([PositionState]) monitorSlowTiles = new ArraySchema<PositionState>();
   @type({ map: "number" }) slowedUntilBySession = new MapSchema<number>();
-  @type([ConveyorState]) conveyors = new ArraySchema<ConveyorState>();
-  @type([MachineState]) machines = new ArraySchema<MachineState>();
-  @type("number") itemX: number = 0;
-  @type("number") itemY: number = 0;
-  @type("number") processedCount: number = 0;
-  @type("string") itemState: string = "RAW_PART";
-  @type("string") statusMessage: string = "Route the raw part to the forming mill.";
-  @type("boolean") complete: boolean = false;
+  @type("string") hiddenEngineerColor: string = "";
+  @type("number") engineerSwitchX: number = -1;
+  @type("number") engineerSwitchY: number = -1;
+  @type({ map: "number" }) flipCooldownByColor = new MapSchema<number>();
 }
 
 export class GameState extends Schema {

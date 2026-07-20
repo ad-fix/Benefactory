@@ -9,7 +9,6 @@ import { usePlatformVoice } from "@/hooks/usePlatformVoice";
 import { useSounds } from "@/hooks/use-sounds";
 import { PlatformVoiceOverlay } from "@/components/game/PlatformVoiceOverlay";
 import { ResultsOverlay } from "@/components/game/ResultsOverlay";
-import { FactoryLevelProvider } from "@/levels/roles/RolesLevelView";
 
 /** Build a redirect URL back to the platform with query params */
 function buildReturnUrl(returnUrl: string, params: Record<string, string | number>): string {
@@ -41,23 +40,7 @@ interface ButtonStateServer {
   y: number;
   behaviorType: string;
   isActive: boolean;
-}
-
-interface ConveyorStateServer {
-  id: string;
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  owner: string;
-}
-
-interface MachineStateServer {
-  id: string;
-  machineType: string;
-  order: number;
-  x: number;
-  y: number;
+  relocateAt: number;
 }
 
 interface ServerGameState {
@@ -83,14 +66,10 @@ interface ServerGameState {
     confirmationExpiresAt: number;
     expiryCount: number;
     slowedUntilBySession: Map<string, number>;
-    conveyors: ConveyorStateServer[];
-    machines: MachineStateServer[];
-    itemX: number;
-    itemY: number;
-    processedCount: number;
-    itemState: string;
-    statusMessage: string;
-    complete: boolean;
+    hiddenEngineerColor: string;
+    engineerSwitchX: number;
+    engineerSwitchY: number;
+    flipCooldownByColor: Map<string, number>;
   };
 }
 
@@ -101,6 +80,7 @@ interface ButtonLocal {
   y: number;
   behaviorType: string;
   isActive: boolean;
+  relocateAt: number;
 }
 
 interface RolesLevelLocal {
@@ -115,14 +95,10 @@ interface RolesLevelLocal {
   confirmationExpiresAt: number;
   expiryCount: number;
   slowedUntilBySession: Map<string, number>;
-  conveyors: ConveyorStateServer[];
-  machines: MachineStateServer[];
-  itemX: number;
-  itemY: number;
-  processedCount: number;
-  itemState: string;
-  statusMessage: string;
-  complete: boolean;
+  hiddenEngineerColor: string;
+  engineerSwitchX: number;
+  engineerSwitchY: number;
+  flipCooldownByColor: Map<string, number>;
 }
 
 // Batched game state — updated atomically via reducer
@@ -153,7 +129,7 @@ const initialGameState: GameStateLocal = {
   isGameOver: false,
   seed: 0,
   currentLevel: "roles",
-  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), conveyors: [], machines: [], itemX: 0, itemY: 0, processedCount: 0, itemState: "RAW_PART", statusMessage: "Waiting for factory layout…", complete: false },
+  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map() },
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -272,15 +248,19 @@ const Index = () => {
     const rl = gameRoom.state.rolesLevel;
     const operatorButtons: ButtonLocal[] = [];
     rl?.operatorButtons?.forEach((b) => {
-      operatorButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive });
+      operatorButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive, relocateAt: b.relocateAt });
     });
     const engineerButtons: ButtonLocal[] = [];
     rl?.engineerButtons?.forEach((b) => {
-      engineerButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive });
+      engineerButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive, relocateAt: b.relocateAt });
     });
     const slowedUntilBySession = new Map<string, number>();
     rl?.slowedUntilBySession?.forEach((until, sessionId) => {
       slowedUntilBySession.set(sessionId, until);
+    });
+    const flipCooldownByColor = new Map<string, number>();
+    rl?.flipCooldownByColor?.forEach((until, color) => {
+      flipCooldownByColor.set(color, until);
     });
 
     dispatch({
@@ -308,14 +288,10 @@ const Index = () => {
           confirmationExpiresAt: rl?.confirmationExpiresAt ?? 0,
           expiryCount: rl?.expiryCount ?? 0,
           slowedUntilBySession,
-          conveyors: rl?.conveyors ? Array.from(rl.conveyors) : [],
-          machines: rl?.machines ? Array.from(rl.machines) : [],
-          itemX: rl?.itemX ?? 0,
-          itemY: rl?.itemY ?? 0,
-          processedCount: rl?.processedCount ?? 0,
-          itemState: rl?.itemState ?? "RAW_PART",
-          statusMessage: rl?.statusMessage ?? "Waiting for factory layout…",
-          complete: rl?.complete ?? false,
+          hiddenEngineerColor: rl?.hiddenEngineerColor ?? "",
+          engineerSwitchX: rl?.engineerSwitchX ?? -1,
+          engineerSwitchY: rl?.engineerSwitchY ?? -1,
+          flipCooldownByColor,
         },
       },
     });
@@ -591,13 +567,6 @@ const Index = () => {
 
   return (
     <div className="relative min-h-dvh w-full bg-canvas text-foreground">
-      <FactoryLevelProvider
-        rolesLevel={gameState.rolesLevel}
-        gridWidth={gameState.gridWidth}
-        gridHeight={gameState.gridHeight}
-        playersConnected={gameState.players.size}
-        roomId={room?.roomId ?? ""}
-      >
       <GameScreen
         room={room}
         players={gameState.players}
@@ -609,7 +578,9 @@ const Index = () => {
         isSoloMode={initPayload?.soloMode || false}
         stage={gameState.stage}
         timeRemaining={gameState.timeRemaining}
+        isDevMode={initPayload?.devMode || false}
         isSpectator={isSpectator}
+        seed={gameState.seed}
         isGameOver={gameState.isGameOver}
         countdown={gameState.countdown}
         bgMusicVolume={initPayload?.bgMusicUrl ? bgMusicVolume : undefined}
@@ -618,7 +589,6 @@ const Index = () => {
         rolesLevel={gameState.rolesLevel}
         onLeave={handleLeave}
       />
-      </FactoryLevelProvider>
       {/* TODO: revert — temporarily showing overlay in solo mode */}
       <PlatformVoiceOverlay
         participants={voice.participants}

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import type { GameInitPayload } from "@/lib/session-storage";
-import { Users, LogIn } from "lucide-react";
+import { Users, Swords, LogIn } from "lucide-react";
 
 const NAME_STORAGE_KEY = "pw-player-name";
 
@@ -24,7 +24,7 @@ const MainMenu = () => {
 
   // Create a fresh room (solo or multiplayer), or join an existing one by its
   // Colyseus room id. roomId === undefined → client.create; otherwise joinById.
-  const startGame = (roomId?: string) => {
+  const startGame = (soloMode: boolean, roomId?: string) => {
     const name = resolvedName;
     if (!name) {
       toast({
@@ -50,18 +50,19 @@ const MainMenu = () => {
       userId: crypto.randomUUID(),
       playerName: name,
       isAdmin: false,
-      devMode: false,
-      soloMode: false,
+      devMode: import.meta.env.DEV,
+      soloMode,
       roomId,
     };
     navigate("/play", { state: { initPayload } });
   };
 
-  const handleMultiplayer = () => startGame();
+  const handleSolo = () => startGame(true);
+  const handleMultiplayer = () => startGame(false);
   const handleJoinRoom = () => {
     const id = joinRoomId.trim();
     if (!id) return;
-    startGame(id);
+    startGame(false, id);
   };
 
   return (
@@ -75,8 +76,9 @@ const MainMenu = () => {
             id="main-menu-title"
             className="text-4xl font-bold text-white tracking-tight"
           >
-            Benefactory
+            Polar Winds
           </h1>
+          <p className="text-slate-500 text-sm">Enter a name and pick a mode to play.</p>
         </header>
 
         <section className="space-y-3 text-left" aria-label="Player name">
@@ -103,13 +105,22 @@ const MainMenu = () => {
           <div className="space-y-3">
             <Button
               type="button"
-              onClick={handleMultiplayer}
+              onClick={handleSolo}
               className="w-full h-14 bg-blue-600 text-white hover:bg-blue-700 text-lg font-semibold gap-3"
             >
-              <Users className="w-5 h-5 shrink-0" aria-hidden />
-              Create Multiplayer Room
+              <Swords className="w-5 h-5 shrink-0" aria-hidden />
+              Solo Game
             </Button>
 
+            <Button
+              type="button"
+              onClick={handleMultiplayer}
+              variant="outline"
+              className="w-full h-14 border border-white/10 bg-white/5 text-white text-lg font-semibold gap-3 hover:bg-white/10 hover:text-white"
+            >
+              <Users className="w-5 h-5 shrink-0" aria-hidden />
+              Multiplayer
+            </Button>
           </div>
         </section>
 
@@ -119,8 +130,8 @@ const MainMenu = () => {
               Play with friends
             </p>
             <p className="text-xs text-slate-500 leading-snug pr-1">
-              Enter the room code shared by the first player. The game starts
-              after three different players have joined.
+              Enter a room code to join a friend's multiplayer room. Start a
+              Multiplayer game above, then share your room code with friends.
             </p>
           </div>
           <div className="flex gap-2">
