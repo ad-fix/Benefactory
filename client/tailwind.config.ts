@@ -14,7 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        "sans": ['"Clash Grotesk"', "sans-serif"],
+        sans: ['"Clash Grotesk"', "sans-serif"],
+        droog: ['"Droog Heavy"', "sans-serif"],
+
       },
       colors: {
         canvas: {

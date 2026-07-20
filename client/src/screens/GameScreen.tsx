@@ -352,6 +352,8 @@ const showPopup = (imageUrl: string, label: string) => {
   popupCounter.current += 1;
   setActivePopup({ imageUrl, label, triggerId: popupCounter.current });
 };
+  console.log("currentLevel:", currentLevel, "stage:", stage);
+
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsExiting, setSettingsExiting] = useState(false);
@@ -1090,14 +1092,22 @@ const showPopup = (imageUrl: string, label: string) => {
         < Level1Mesh /> 
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
         
-           {(LEVEL_INTERACTABLES[currentLevel]?.[stage] ?? []).map((item) => (
-              <InteractableItem
-                key={item.id}
-                imageUrl={item.imageUrl}
-                position={getVisualPos(item.gridX, item.gridY, 0)}
-                onInteract={() => showPopup(item.imageUrl, item.label)}
-              />
-            ))}
+           {(LEVEL_INTERACTABLES[currentLevel]?.[stage] ?? []).map((item) => {
+            const MAX_GRID = 26;
+            const center = Math.floor(MAX_GRID / 2);
+            const minX = center - Math.floor(gridWidth / 2);
+            const minY = center - Math.floor(gridHeight / 2);
+            return (
+            <InteractableItem
+              key={item.id}
+              imageUrl={item.imageUrl}
+              position={getVisualPos(minX + item.gridX, minY + item.gridY, 0)}
+              size={item.size}
+              rotation={item.id === "bomb" ? [-Math.PI / 2, 0 , -Math.PI / 2 ] : undefined}
+              onInteract={() => showPopup(item.imageUrl, item.label)}
+                />
+              );
+            })}
 
             {/* Players */}
             {Array.from(players.values()).map((player, index) => {

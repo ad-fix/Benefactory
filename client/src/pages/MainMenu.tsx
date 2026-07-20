@@ -76,9 +76,9 @@ const MainMenu = () => {
         <header className="space-y-2">
           <h1
             id="main-menu-title"
-            className="text-4xl font-bold text-white tracking-tight"
+            className="text-4xl font-bold text-white tracking-tight font-droog"
           >
-            Polar Winds
+            Benefactory
           </h1>
           <p className="text-slate-500 text-sm">Enter a name and pick a mode to play.</p>
         </header>

@@ -7,10 +7,11 @@ interface InteractableItemProps {
   imageUrl: string;
   position: [number, number, number];
   size?: number;
+  rotation?: [number, number, number];
   onInteract: () => void;
 }
 
-export function InteractableItem({ imageUrl, position, size = 1.2, onInteract }: InteractableItemProps) {
+  export function InteractableItem({ imageUrl, position, size = 1.2, rotation = [-Math.PI / 2, 0, 0], onInteract }: InteractableItemProps) {
   const texture = useTexture(imageUrl);
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
@@ -24,13 +25,13 @@ export function InteractableItem({ imageUrl, position, size = 1.2, onInteract }:
   return (
     <group ref={groupRef} position={position}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
-        <circleGeometry args={[size * 0.55, 24]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.35} depthWrite={false} />
+        <circleGeometry args={[size * 0.20, 24]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.20} depthWrite={false} />
       </mesh>
 
       <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0.05, 0]}
+        rotation={rotation}
+        position={[0, 0.03, 0]}
         scale={hovered ? 1.08 : 1}
         onClick={(e) => { e.stopPropagation(); onInteract(); }}
         onPointerOver={() => setHovered(true)}
