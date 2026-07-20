@@ -21,6 +21,7 @@ import { DevStageControls } from "@/components/game/DevStageControls";
 import { GameControls } from "@/components/game/GameControls";
 import { NebulaBackdrop } from "@/components/game/NebulaBackdrop";
 import { RolesLevelView } from "@/levels/roles/RolesLevelView";
+import { ConveyorLevelView } from "@/levels/conveyors/ConveyorLevelView";
 import { ButtonDot } from "@/levels/roles/ButtonDot";
 import { ConfirmationTile } from "@/levels/roles/ConfirmationTile";
 import { SwitchTile } from "@/levels/roles/SwitchTile";
@@ -75,6 +76,35 @@ interface RolesLevelLocal {
   engineerSwitchX: number;
   engineerSwitchY: number;
   flipCooldownByColor: Map<string, number>;
+}
+
+interface ConveyorLocal {
+  id: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  owner: string;
+}
+
+interface MachineLocal {
+  id: string;
+  machineType: string;
+  order: number;
+  x: number;
+  y: number;
+}
+
+interface ConveyorLevelLocal {
+  stage: number;
+  conveyors: ConveyorLocal[];
+  machines: MachineLocal[];
+  itemX: number;
+  itemY: number;
+  processedCount: number;
+  itemState: string;
+  statusMessage: string;
+  complete: boolean;
 }
 
 interface Ping {
@@ -234,6 +264,7 @@ interface GameScreenProps {
   onBgMusicVolumeChange?: (volume: number) => void;
   challengeName?: string;
   rolesLevel?: RolesLevelLocal;
+  conveyorLevel?: ConveyorLevelLocal;
   onLeave?: () => void;
 }
 
@@ -333,6 +364,7 @@ export const GameScreen = ({
   onBgMusicVolumeChange,
   challengeName,
   rolesLevel,
+  conveyorLevel,
   onLeave,
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
@@ -1207,6 +1239,7 @@ export const GameScreen = ({
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
 
       {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} room={room} />}
+      {currentLevel === "conveyors" && conveyorLevel && <ConveyorLevelView role={myRole ?? ""} />}
 
       {/* Leave confirmation dialog */}
       {showLeaveConfirm && (
