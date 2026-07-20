@@ -2,6 +2,8 @@ import { useRef, useMemo, useLayoutEffect, useState, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { getFloorTint, getPlayerHex } from "@/constants/playerColors";
+import { Line } from "@react-three/drei";
+
 
 interface ParticleFloorProps {
     gridWidth?: number;
@@ -9,12 +11,25 @@ interface ParticleFloorProps {
     spacing?: number;
     nodeStates?: (string | null)[][];
     rippleTrigger?: number; // Increment this to trigger a ripple
+    collectibles?: { x: number; y: number; color: string; type: string; id: string }[];
 }
 
-export function ParticleFloor({ gridWidth = 10, gridHeight = 8, spacing = 2.5, nodeStates, rippleTrigger = 0 }: ParticleFloorProps) {
+export function ParticleFloor({ gridWidth = 10, gridHeight = 8, spacing = 2.5, nodeStates, rippleTrigger = 0, collectibles = [] }: ParticleFloorProps) {
     const meshRef = useRef<THREE.InstancedMesh>(null);
     const [tempObject] = useState(() => new THREE.Object3D());
     const rippleStartTime = useRef<number>(-10); // Start with ripple already "finished"
+
+    const [isDragging, setIsDragging] = useState(false);
+    const [startCell, setStartCell] = useState<{ x: number; z: number } | null>(null);
+    const [pathPoints, setPathPoints] = useState<{ x: number; z: number }[]>([]);
+
+    const [pathColor, setPathColor] = useState("orange");
+
+    const [completedPaths, setCompletedPaths] = useState<
+      { points: { x: number; z: number }[]; color: string }[]
+    >([]);
+
+    const [usedEndpointIds, setUsedEndpointIds] = useState<Set<string>>(new Set());
 
     // 1. Grid layout
     const { totalNodes, offsetX, offsetZ } = useMemo(() => ({
@@ -26,6 +41,7 @@ export function ParticleFloor({ gridWidth = 10, gridHeight = 8, spacing = 2.5, n
     // Update instance matrices (positions)
     useLayoutEffect(() => {
         if (!meshRef.current) return;
+
 
         let i = 0;
         for (let gx = 0; gx < gridWidth; gx++) {
@@ -177,19 +193,184 @@ export function ParticleFloor({ gridWidth = 10, gridHeight = 8, spacing = 2.5, n
     `;
 
     return (
-        <instancedMesh ref={meshRef} args={[undefined, undefined, totalNodes]}>
-            <planeGeometry args={[1.6, 1.6]}>
-                <instancedBufferAttribute attach="attributes-instanceColor" args={[colorArray, 3]} />
-            </planeGeometry>
-            <shaderMaterial
-                vertexShader={vertexShader}
-                fragmentShader={fragmentShader}
-                uniforms={uniforms}
-                transparent
-                depthWrite={false}
-                side={THREE.DoubleSide}
-                blending={THREE.AdditiveBlending}
-            />
-        </instancedMesh>
-    );
+    <>
+      <instancedMesh
+        ref={meshRef}
+        args={[undefined, undefined, totalNodes]}
+        onPointerDown={(e) => {
+          const offsetX = (gridWidth - 1) / 2;
+          const offsetZ = (gridHeight - 1) / 2;
+
+          const gridX = Math.round(e.point.x / spacing + offsetX);
+          const gridZ = Math.round(e.point.z / spacing + offsetZ);
+
+          const MAX_GRID = 26;
+          const center = Math.floor(MAX_GRID / 2);
+          const halfWidth = Math.floor(gridWidth / 2);
+          const halfHeight = Math.floor(gridHeight / 2);
+          const minX = center - halfWidth;
+          const minY = center - halfHeight;
+
+          const absX = gridX + minX;
+          const absZ = gridZ + minY;
+
+          console.log("Clicked local:", gridX, gridZ, "-> absolute:", absX, absZ);
+
+          const endpoint = collectibles.find((c) => c.x === absX && c.y === absZ);
+          if (!endpoint) {
+            console.log("No endpoint here, ignoring drag start");
+            return;
+          }
+
+          if (usedEndpointIds.has(endpoint.id)) {
+            console.log("This endpoint is already connected, ignoring drag start");
+            return;
+          }
+
+          const hexColor = getPlayerHex(endpoint.color);
+
+          setPathColor(hexColor);
+          setIsDragging(true);
+          setStartCell({ x: gridX, z: gridZ });
+          setPathPoints([{ x: gridX, z: gridZ }]);
+        }}
+        onPointerMove={(e) => {
+          if (!isDragging) return;
+
+          const offsetX = (gridWidth - 1) / 2;
+          const offsetZ = (gridHeight - 1) / 2;
+
+          const gridX = Math.round(e.point.x / spacing + offsetX);
+          const gridZ = Math.round(e.point.z / spacing + offsetZ);
+
+          const isCellClaimed = (x: number, z: number, excludeSelf = false) => {
+            for (const path of completedPaths) {
+              if (path.points.some((p) => p.x === x && p.z === z)) {
+                return true;
+              }
+            }
+            if (!excludeSelf) {
+              if (pathPoints.some((p) => p.x === x && p.z === z)) {
+                return true;
+              }
+            }
+            return false;
+          };
+
+          setPathPoints((prev) => {
+            const last = prev[prev.length - 1];
+            if (!last) return prev;
+
+            const dx = Math.abs(gridX - last.x);
+            const dz = Math.abs(gridZ - last.z);
+
+            if (dx === 0 && dz === 0) return prev;
+
+            const isOrthogonalStep = (dx === 1 && dz === 0) || (dx === 0 && dz === 1);
+            if (!isOrthogonalStep) return prev;
+
+            if (isCellClaimed(gridX, gridZ)) {
+              console.log("Cell already claimed, blocking move");
+              return prev;
+            }
+
+            return [...prev, { x: gridX, z: gridZ }];
+          });
+        }}
+        onPointerUp={(e) => {
+          const MAX_GRID = 26;
+          const center = Math.floor(MAX_GRID / 2);
+          const halfWidth = Math.floor(gridWidth / 2);
+          const halfHeight = Math.floor(gridHeight / 2);
+          const minX = center - halfWidth;
+          const minY = center - halfHeight;
+
+          const last = pathPoints[pathPoints.length - 1];
+          const first = pathPoints[0];
+
+          let validEnd = false;
+          let startEndpoint: typeof collectibles[number] | undefined;
+          let endEndpoint: typeof collectibles[number] | undefined;
+
+          if (last && first && pathPoints.length > 1) {
+            const lastAbsX = last.x + minX;
+            const lastAbsZ = last.z + minY;
+
+            startEndpoint = collectibles.find(
+              (c) => c.x === first.x + minX && c.y === first.z + minY
+            );
+            endEndpoint = collectibles.find(
+              (c) => c.x === lastAbsX && c.y === lastAbsZ
+            );
+
+            if (
+              startEndpoint &&
+              endEndpoint &&
+              endEndpoint.color === startEndpoint.color &&
+              endEndpoint.id !== startEndpoint.id &&
+              !usedEndpointIds.has(endEndpoint.id) &&
+              !usedEndpointIds.has(startEndpoint.id)
+            ) {
+              validEnd = true;
+            }
+          }
+
+          if (validEnd && startEndpoint && endEndpoint) {
+            console.log("VALID WIRE! Connected", first, "to", last);
+            setCompletedPaths((prev) => [...prev, { points: pathPoints, color: pathColor }]);
+            setUsedEndpointIds((prev) => {
+              const updated = new Set(prev);
+              updated.add(startEndpoint!.id);
+              updated.add(endEndpoint!.id);
+              return updated;
+            });
+          } else {
+            console.log("Invalid wire — didn't end on a matching endpoint. Discarding.");
+          }
+
+          setIsDragging(false);
+          setStartCell(null);
+          setPathPoints([]);
+        }}
+      >
+        <planeGeometry args={[1.6, 1.6]}>
+          <instancedBufferAttribute attach="attributes-instanceColor" args={[colorArray, 3]} />
+        </planeGeometry>
+        <shaderMaterial
+          vertexShader={vertexShader}
+          fragmentShader={fragmentShader}
+          uniforms={uniforms}
+          transparent
+          depthWrite={false}
+          side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
+        />
+      </instancedMesh>
+
+      {completedPaths.map((path, i) => (
+        <Line
+          key={i}
+          points={path.points.map((p) => [
+            (p.x - (gridWidth - 1) / 2) * spacing,
+            -2.4,
+            (p.z - (gridHeight - 1) / 2) * spacing,
+          ])}
+          color={path.color}
+          lineWidth={5}
+        />
+      ))}
+
+      {pathPoints.length > 1 && (
+        <Line
+          points={pathPoints.map((p) => [
+            (p.x - (gridWidth - 1) / 2) * spacing,
+            -2.4,
+            (p.z - (gridHeight - 1) / 2) * spacing,
+          ])}
+          color={pathColor}
+          lineWidth={5}
+        />
+      )}
+    </>
+  );
 }

@@ -2151,7 +2151,7 @@ export const GameScreen = ({
         <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
         <pointLight position={[-10, -10, -10]} intensity={0.5} color={getFloorTint("GREEN")} />
 
-        <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} nodeStates={nodeStates} rippleTrigger={rippleTrigger} />
+        <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} nodeStates={nodeStates} rippleTrigger={rippleTrigger} collectibles={collectibles} />
             <ConnectionLines key={`lines-${gridWidth}-${gridHeight}`} nodeStates={nodeStates} gridWidth={gridWidth} gridHeight={gridHeight} />
 
             {/* Collectibles */}
@@ -2161,7 +2161,7 @@ export const GameScreen = ({
 
               if (collectible.type === "network") {
                 return (
-                  <group key={collectible.id} position={pos}>
+                  <group key={collectible.id} position={pos} raycast={() => null}>
                     <GoldAura isGold={collectible.isGold} color={displayColor}>
                       <SpinningLambda color={displayColor} connected={collectible.isActivated} />
                     </GoldAura>
@@ -2169,7 +2169,7 @@ export const GameScreen = ({
                 );
               } else if (collectible.type === "box") {
                 return (
-                  <group key={collectible.id} position={pos}>
+                  <group key={collectible.id} position={pos} raycast={() => null}>
                     <GoldAura isGold={collectible.isGold} color={displayColor}>
                       <group rotation={[0, Math.PI / 8, 0]}>
                         <CubeFrame color={displayColor} scale={0.75} connected={collectible.isActivated} />
@@ -2179,7 +2179,7 @@ export const GameScreen = ({
                 );
               } else if (collectible.type === "equilibrium") {
                 return (
-                  <group key={collectible.id} position={pos}>
+                  <group key={collectible.id} position={pos} raycast={() => null}>
                     <GoldAura isGold={collectible.isGold} color={displayColor}>
                       <group rotation={[Math.PI / 2, 0, 0]}>
                         <EquilateralTriangle color={displayColor} scale={1.0} connected={collectible.isActivated} />
@@ -2191,7 +2191,7 @@ export const GameScreen = ({
                 const rotationY = Math.PI + (collectible.orientation * Math.PI) / 180;
                 const flipScale = collectible.isFlipped ? -1 : 1;
                 return (
-                  <group key={collectible.id} position={pos}>
+                  <group key={collectible.id} position={pos} raycast={() => null}>
                     <GoldAura isGold={collectible.isGold} color={displayColor}>
                       <group rotation={[0, rotationY, 0]} scale={[flipScale, 1, 1]}>
                         <Hand color={displayColor} scale={0.6} connected={collectible.isActivated} />
@@ -2201,7 +2201,7 @@ export const GameScreen = ({
                 );
               } else if (collectible.type === "vantage") {
                 return (
-                  <group key={collectible.id} position={pos}>
+                  <group key={collectible.id} position={pos} raycast={() => null}>
                     <GoldAura isGold={collectible.isGold} color={displayColor}>
                       <group rotation={[Math.PI / 2, 0, 0]} scale={0.5}>
                         <Compass color={displayColor} scale={1.0} connected={collectible.isActivated} />
@@ -2211,7 +2211,7 @@ export const GameScreen = ({
                 );
               } else if (collectible.type === "galaxy") {
                 return (
-                  <group key={collectible.id} position={pos}>
+                  <group key={collectible.id} position={pos} raycast={() => null}>
                     <GoldAura isGold={collectible.isGold} color={displayColor}>
                       <group rotation={[Math.PI / 2, 0, 0]}>
                         <GalaxyModel color={displayColor} scale={0.72} connected={collectible.isActivated} />
@@ -2221,7 +2221,7 @@ export const GameScreen = ({
                 );
               } else if (collectible.type === "polyomino") {
                 return (
-                  <group key={collectible.id} position={pos}>
+                  <group key={collectible.id} position={pos} raycast={() => null}>
                     <GoldAura isGold={collectible.isGold} color={displayColor}>
                       <Polyomino color={displayColor} playerColor={collectible.color} scale={1.0} connected={collectible.isActivated} />
                     </GoldAura>
@@ -2248,6 +2248,7 @@ export const GameScreen = ({
             ))}
 
             {/* Players */}
+            {/*
             {Array.from(players.values()).map((player, index) => {
               const isMe = isSoloMode ? index === activePlayerIndex : player.color === myColor;
               // Use predicted position for local player in multiplayer
@@ -2264,6 +2265,10 @@ export const GameScreen = ({
                 />
               );
             })}
+                  // NOTE TO SELF 7.2.2026: Making all of this a comment instead to test out getting rid of the original
+                    Polar Winds W,A,S,D player icons!! 
+
+            */} 
 
             {/* Enemies */}
             {enemies.map((enemy) => {
