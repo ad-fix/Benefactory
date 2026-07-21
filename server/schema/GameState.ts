@@ -1,4 +1,6 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
+import { SetSchema } from "@colyseus/schema";
+// ...
 
 export type PlayerColor = "RED" | "GREEN" | "BLUE";
 export type PlayerRole = "OPERATOR" | "ENGINEER" | "MONITOR";
@@ -12,6 +14,7 @@ export class Player extends Schema {
   @type("string") name: string = "";
   @type("string") school: string = "";
   @type("string") discordName: string = "";
+  @type("string") heldWirecutter: string = ""; // "" | "red" | "blue" | "green"
 }
 
 export class ButtonState extends Schema {
@@ -71,4 +74,9 @@ export class GameState extends Schema {
   @type("string") currentLevel: string = "roles";
 
   @type(RolesLevelState) rolesLevel = new RolesLevelState();
+
+  @type({ set: "string" }) collectedItems = new SetSchema<string>();
+
+  @type("boolean") currentLevelComplete: boolean = false;
+
 }
