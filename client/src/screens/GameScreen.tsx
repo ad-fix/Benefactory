@@ -3,10 +3,14 @@ import type { ErrorInfo, ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrthographicCamera } from "@react-three/drei";
 import * as Client from "colyseus.js";
+import { Level1Mesh } from "@/components/game/Level1Mesh";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 import { Player } from "@/components/Player";
 import { ParticleFloor } from "@/components/ParticleFloor";
+import { useAmbientMusic } from "@/hooks/use-ambient-music";
+import { LEVEL_MUSIC, DEFAULT_LEVEL_MUSIC } from "@/constants/levelMusic";
+// adding in ambient music to levels
 
 import { PulseRipple } from "@/components/game/PulseRipple";
 import { ClickHandler } from "@/components/ClickHandler";
@@ -14,6 +18,10 @@ import { Info, LogOut, Settings, TriangleAlert, Volume2, VolumeX, X } from "luci
 import { cn } from "@/lib/utils";
 import { useSounds } from "@/hooks/use-sounds";
 // Removed: PolarAmbientParticlesCanvas, NoiseBlobFieldCanvas — hidden behind opaque R3F canvas, wasted WebGL contexts
+import { InteractablePopup } from "@/components/game/InteractablePopup";
+// adding interactable objects depending on level and stage
+import { InteractableItem } from "@/components/game/InteractableItem";
+import { LEVEL_INTERACTABLES } from "@/constants/levelInteractables";
 import { HudCornerLs, POLAR_HUD } from "@/components/ui/polar-chrome";
 import { NoiseFieldOverlay, type NoiseFieldHandle } from "@/components/game/NoiseFieldOverlay";
 import { StageAnnouncement } from "@/components/game/StageAnnouncement";
@@ -336,6 +344,16 @@ export const GameScreen = ({
   onLeave,
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
+  useAmbientMusic(LEVEL_MUSIC[currentLevel] ?? DEFAULT_LEVEL_MUSIC);
+  const [activePopup, setActivePopup] = useState<{ imageUrl: string; label: string; triggerId: number } | null>(null);
+const popupCounter = useRef(0);
+
+const showPopup = (imageUrl: string, label: string) => {
+  popupCounter.current += 1;
+  setActivePopup({ imageUrl, label, triggerId: popupCounter.current });
+};
+  console.log("currentLevel:", currentLevel, "stage:", stage);
+
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsExiting, setSettingsExiting] = useState(false);
@@ -400,7 +418,6 @@ export const GameScreen = ({
     if (!room) return;
 
     const handlePing = (message: { x: number; y: number; color: PlayerColor }) => {
-      playSound("ping");
       const now = Date.now();
       const newPing: Ping = {
         id: crypto.randomUUID(),
@@ -570,8 +587,7 @@ export const GameScreen = ({
           );
 
           if (!isBlocked) {
-            playSound("move");
-            // Track this pending input
+                        // Track this pending input
             const seq = ++seqCounterRef.current;
             pendingInputsRef.current.set(seq, { x: newX, y: newY });
             setPredictedPos({ x: newX, y: newY });
@@ -1073,8 +1089,25 @@ export const GameScreen = ({
         <ambientLight intensity={0.7} />
         <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
         <pointLight position={[-10, -10, -10]} intensity={0.5} color={getFloorTint("GREEN")} />
-
+        < Level1Mesh /> 
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
+        
+           {(LEVEL_INTERACTABLES[currentLevel]?.[stage] ?? []).map((item) => {
+            const MAX_GRID = 26;
+            const center = Math.floor(MAX_GRID / 2);
+            const minX = center - Math.floor(gridWidth / 2);
+            const minY = center - Math.floor(gridHeight / 2);
+            return (
+            <InteractableItem
+              key={item.id}
+              imageUrl={item.imageUrl}
+              position={getVisualPos(minX + item.gridX, minY + item.gridY, 0)}
+              size={item.size}
+              rotation={item.id === "bomb" ? [-Math.PI / 2, 0 , -Math.PI / 2 ] : undefined}
+              onInteract={() => showPopup(item.imageUrl, item.label)}
+                />
+              );
+            })}
 
             {/* Players */}
             {Array.from(players.values()).map((player, index) => {
@@ -1205,6 +1238,15 @@ export const GameScreen = ({
       <NoiseFieldOverlay ref={noiseFieldRef} resolutionScale={0.8} />
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
+
+         {activePopup && (              
+        <InteractablePopup
+          key={activePopup.triggerId}
+          imageUrl={activePopup.imageUrl}
+          label={activePopup.label}
+          onClose={() => setActivePopup(null)}
+        />
+      )}
 
       {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} room={room} />}
 

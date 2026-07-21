@@ -220,7 +220,6 @@ const Index = () => {
     if (current > 0) countdownMaxRef.current = Math.max(countdownMaxRef.current, current);
 
     if (current !== prev && current >= 0 && current <= countdownMaxRef.current) {
-      playSound("move");
     }
 
     if (prev > 0 && current === 0) {
@@ -428,6 +427,7 @@ const Index = () => {
               userId: initPayload.userId,
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
+              
             });
 
         connectedRoomIdRef.current = gameRoom.roomId;

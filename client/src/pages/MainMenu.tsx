@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useAmbientMusic } from "@/hooks/use-ambient-music";
 import type { GameInitPayload } from "@/lib/session-storage";
 import { Users, Swords, LogIn } from "lucide-react";
 
@@ -11,6 +12,7 @@ const NAME_STORAGE_KEY = "pw-player-name";
 const MainMenu = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  useAmbientMusic("/music/Refreshments.mp3");
   const [playerName, setPlayerName] = useState("");
   const [joinRoomId, setJoinRoomId] = useState("");
 
@@ -74,9 +76,9 @@ const MainMenu = () => {
         <header className="space-y-2">
           <h1
             id="main-menu-title"
-            className="text-4xl font-bold text-white tracking-tight"
+            className="text-4xl font-bold text-white tracking-tight font-droog"
           >
-            Polar Winds
+            Benefactory
           </h1>
           <p className="text-slate-500 text-sm">Enter a name and pick a mode to play.</p>
         </header>
