@@ -3,7 +3,8 @@ import type { ErrorInfo, ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrthographicCamera } from "@react-three/drei";
 import * as Client from "colyseus.js";
-import { Level1Mesh } from "@/components/game/Level1Mesh";
+import { LevelMesh } from "@/components/game/LevelMesh";
+import { LEVEL_MESHES } from "@/constants/levelMeshes";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 import { Player } from "@/components/Player";
@@ -1089,7 +1090,14 @@ const showPopup = (imageUrl: string, label: string) => {
         <ambientLight intensity={0.7} />
         <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
         <pointLight position={[-10, -10, -10]} intensity={0.5} color={getFloorTint("GREEN")} />
-        < Level1Mesh /> 
+        {LEVEL_MESHES[currentLevel] && (
+  <LevelMesh
+    key={currentLevel}
+    url={LEVEL_MESHES[currentLevel].url}
+    position={LEVEL_MESHES[currentLevel].position}
+    scale={LEVEL_MESHES[currentLevel].scale}
+  />
+)} 
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
         
            {(LEVEL_INTERACTABLES[currentLevel]?.[stage] ?? []).map((item) => {
