@@ -5,24 +5,21 @@ export interface InteractableConfig {
   gridX: number;
   gridY: number;
   size?: number;
+  pickup?: "red" | "blue" | "green";
+  unlockStage?: number;
+  requiresLevelComplete?: boolean;
 }
 
-export const LEVEL_INTERACTABLES: Record<string, Record<number, InteractableConfig[]>> = {
-  level1: {
-    1: [
-      { id: "bomb", imageUrl: "/images/bomb.png", label: "The bomb — still ticking. Tools are needed to cut the wires...", gridX: 3.7, gridY: 3.1, size: 4 },
-      { id: "note", imageUrl: "/images/found-note.png", label: "A hastily scrawled note.", gridX: 1, gridY: 0.3, size: 1.8 },
-    ],
-      // { id: "wirecutter-green", imageUrl: "/images/wirecutter-green.png", label: "Green wirecutter", gridX: 8, gridY: 6 },
-  },
-  //roles: //{
-    //2: [
-     //{ id: "wirecutter-blue", imageUrl: "/images/wirecutter-blue.png", label: "A blue wirecutter. It's rusty and hard to move - probably good for only one use.", gridX: 6, gridY: 2 },
-    //]
-    //4: [
-      //{ id: "wirecutter-red", imageUrl: "/images/wirecutter-red.png", label: "A red wirecutter. It's rusty and hard to move - probably good for only one use.", gridX: 6, gridY: 2 },
-    //]
-  //}
-  // test that interactable only appears in stage four (after completion), and is on right gridspace
-  // add conveyor level and interactable
+export const LEVEL_INTERACTABLES: Record<string, InteractableConfig[]> = {
+  level1: [
+    { id: "bomb", imageUrl: "/images/bomb.png", label: "The bomb — still ticking. Tools are needed to cut the wires...", gridX: 3.7, gridY: 3.1, size: 4 },
+    { id: "note", imageUrl: "/images/found-note.png", label: "A hastily scrawled note.", gridX: 1, gridY: 0.3, size: 1.8 },
+  ],
+  roles: [
+    { id: "wirecutter-blue", imageUrl: "/images/wirecutters-blue.png", label: "A blue wirecutter. It's rusty - probably good for only one use.", gridX: 4, gridY: 1, size: 2.5, pickup: "blue", unlockStage: 2 },
+    { id: "wirecutter-red", imageUrl: "/images/wirecutters-red.png", label: "A red wirecutter. It's rusty - probably good for only one use.", gridX: 5, gridY: 1, size: 2.5, pickup: "red", requiresLevelComplete: true },
+  ],
+  conveyor: [
+     { id: "wirecutter-green", imageUrl: "/images/wirecutters-green.png", label: "A green wirecutter. It's rusty - probably good for only one use.", gridX: 4, gridY: 1, size: 2.5, pickup: "green", requiresLevelComplete: true },
+   ],
 };

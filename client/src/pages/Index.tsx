@@ -31,6 +31,7 @@ interface PlayerState {
   name: string;
   school: string;
   discordName: string;
+  heldWirecutter: string;
 }
 
 interface ButtonStateServer {
@@ -54,6 +55,8 @@ interface ServerGameState {
   stage: number;
   seed: number;
   currentLevel: string;
+  collectedItems?: Set<string>;
+  currentLevelComplete?: boolean;
   rolesLevel?: {
     stage: number;
     lights: number;
@@ -113,6 +116,8 @@ interface GameStateLocal {
   isGameOver: boolean;
   seed: number;
   currentLevel: string;
+  collectedItems: Set<string>;
+  currentLevelComplete: boolean;
   rolesLevel: RolesLevelLocal;
 }
 
@@ -129,6 +134,8 @@ const initialGameState: GameStateLocal = {
   isGameOver: false,
   seed: 0,
   currentLevel: "roles",
+  collectedItems: new Set(),
+  currentLevelComplete: false,
   rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map() },
 };
 
@@ -237,7 +244,7 @@ const Index = () => {
 
     const newPlayers = new Map<string, PlayerState>();
     gameRoom.state.players?.forEach((p, id) => {
-      newPlayers.set(id, { x: p.x, y: p.y, color: p.color, role: p.role || "", sessionId: p.sessionId, name: p.name || "", school: p.school || "", discordName: p.discordName || "" });
+      newPlayers.set(id, { x: p.x, y: p.y, color: p.color, role: p.role || "", sessionId: p.sessionId, name: p.name || "", school: p.school || "", discordName: p.discordName || "", heldWirecutter: p.heldWirecutter || "", });
       if (id === gameRoom.sessionId) {
         if (!myColor) setMyColor(p.color);
         setMyRole(p.role);
@@ -275,6 +282,8 @@ const Index = () => {
         isGameOver: gameRoom.state.isGameOver || false,
         timeRemaining: gameRoom.state.timeRemaining ?? 30 * 60,
         currentLevel: gameRoom.state.currentLevel || "roles",
+        collectedItems: gameRoom.state.collectedItems ?? new Set(),
+        currentLevelComplete: gameRoom.state.currentLevelComplete ?? false,
         rolesLevel: {
           stage: rl?.stage ?? 1,
           lights: rl?.lights ?? 0,
@@ -575,6 +584,8 @@ const Index = () => {
         myColor={myColor}
         myRole={myRole}
         currentLevel={gameState.currentLevel}
+        collectedItems={gameState.collectedItems}
+        currentLevelComplete={gameState.currentLevelComplete}
         isSoloMode={initPayload?.soloMode || false}
         stage={gameState.stage}
         timeRemaining={gameState.timeRemaining}

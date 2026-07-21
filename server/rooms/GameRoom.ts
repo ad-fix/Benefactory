@@ -136,6 +136,7 @@ export class GameRoom extends Room<GameState> {
         player.x = newX;
         player.y = newY;
         this.currentLevel.onPlayerMove(player, newX, newY);
+        this.state.currentLevelComplete = this.currentLevel?.isLevelComplete() ?? false;
 
         // Log move for replay
         this.logEvent({ e: "move", p: this.userIds.get(playerKey) || playerKey, d: direction, x: newX, y: newY });
@@ -146,6 +147,15 @@ export class GameRoom extends Room<GameState> {
         client.send("moveAck", { seq: message.seq, x: player.x, y: player.y });
       }
     });
+
+    this.onMessage("pickupItem", (client, message: { itemId: string; wirecutterColor: string }) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      if (player.heldWirecutter) return;                    // already holding one — one slot only
+      if (this.state.collectedItems.has(message.itemId)) return; // someone already got this one
+      this.state.collectedItems.add(message.itemId);
+      player.heldWirecutter = message.wirecutterColor;
+      });
 
     // Handle ping - just broadcast to all clients, don't store in state
     this.onMessage("ping", (client, message: PingMessage) => {
