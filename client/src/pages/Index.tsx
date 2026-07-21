@@ -71,6 +71,11 @@ interface ServerGameState {
     engineerSwitchY: number;
     flipCooldownByColor: Map<string, number>;
   };
+  wiresLevel?: {
+    endpoints: Map<string, { id: string; x: number; y: number; color: string }>;
+    completedWires: Map<string, { color: string; points: Map<string, { x: number; y: number }> }>;
+    usedEndpointIds: Map<string, string>;
+  };
 }
 
 interface ButtonLocal {
@@ -101,6 +106,13 @@ interface RolesLevelLocal {
   flipCooldownByColor: Map<string, number>;
 }
 
+//added by KB 7.20
+interface WiresLevelLocal {
+  endpoints: { id: string; x: number; y: number; color: string }[];
+  completedWires: { color: string; points: { x: number; y: number }[] }[];
+  usedEndpointIds: string[];
+}
+
 // Batched game state — updated atomically via reducer
 interface GameStateLocal {
   gridWidth: number;
@@ -114,6 +126,7 @@ interface GameStateLocal {
   seed: number;
   currentLevel: string;
   rolesLevel: RolesLevelLocal;
+  wiresLevel: WiresLevelLocal; //added by KB 7.20
 }
 
 type GameAction = { type: "SYNC_STATE"; payload: GameStateLocal };
@@ -130,6 +143,7 @@ const initialGameState: GameStateLocal = {
   seed: 0,
   currentLevel: "roles",
   rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map() },
+  wiresLevel: { endpoints: [], completedWires: [], usedEndpointIds: [] }, //added by KB 7.20
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -263,6 +277,21 @@ const Index = () => {
       flipCooldownByColor.set(color, until);
     });
 
+    //added by KB 7.20.26
+    const wl = gameRoom.state.wiresLevel;
+    const endpoints: { id: string; x: number; y: number; color: string }[] = [];
+    wl?.endpoints?.forEach((e) => {
+      endpoints.push({ id: e.id, x: e.x, y: e.y, color: e.color });
+    });
+    const completedWires: { color: string; points: { x: number; y: number }[] }[] = [];
+    wl?.completedWires?.forEach((w) => {
+      const points: { x: number; y: number }[] = [];
+      w.points?.forEach((p) => points.push({ x: p.x, y: p.y }));
+      completedWires.push({ color: w.color, points });
+    });
+    const usedEndpointIds: string[] = [];
+    wl?.usedEndpointIds?.forEach((id) => usedEndpointIds.push(id));
+
     dispatch({
       type: "SYNC_STATE",
       payload: {
@@ -292,6 +321,12 @@ const Index = () => {
           engineerSwitchX: rl?.engineerSwitchX ?? -1,
           engineerSwitchY: rl?.engineerSwitchY ?? -1,
           flipCooldownByColor,
+        },
+        //added by KB 7.20.26
+        wiresLevel: {
+          endpoints,
+          completedWires,
+          usedEndpointIds,
         },
       },
     });
@@ -428,6 +463,7 @@ const Index = () => {
               userId: initPayload.userId,
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
+              level: "wires", // TEMP TEST - added by KB 7.20.26, remove after confirming WiresLevel boots
             });
 
         connectedRoomIdRef.current = gameRoom.roomId;
@@ -587,6 +623,7 @@ const Index = () => {
         onBgMusicVolumeChange={initPayload?.bgMusicUrl ? setBgMusicVolume : undefined}
         challengeName={initPayload?.challengeName}
         rolesLevel={gameState.rolesLevel}
+        wiresLevel={gameState.wiresLevel}
         onLeave={handleLeave}
       />
       {/* TODO: revert — temporarily showing overlay in solo mode */}

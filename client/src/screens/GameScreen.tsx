@@ -22,6 +22,7 @@ import { GameControls } from "@/components/game/GameControls";
 import { NebulaBackdrop } from "@/components/game/NebulaBackdrop";
 import { RolesLevelView } from "@/levels/roles/RolesLevelView";
 import { ButtonDot } from "@/levels/roles/ButtonDot";
+import { Wire } from "@/levels/wires/Wire"; //added by KB 7.20.26
 import { ConfirmationTile } from "@/levels/roles/ConfirmationTile";
 import { SwitchTile } from "@/levels/roles/SwitchTile";
 import { StageLights } from "@/levels/roles/StageLights";
@@ -75,6 +76,13 @@ interface RolesLevelLocal {
   engineerSwitchX: number;
   engineerSwitchY: number;
   flipCooldownByColor: Map<string, number>;
+}
+
+//added by KB 7.20
+interface WiresLevelLocal {
+  endpoints: { id: string; x: number; y: number; color: string }[];
+  completedWires: { color: string; points: { x: number; y: number }[] }[];
+  usedEndpointIds: string[];
 }
 
 interface Ping {
@@ -234,6 +242,7 @@ interface GameScreenProps {
   onBgMusicVolumeChange?: (volume: number) => void;
   challengeName?: string;
   rolesLevel?: RolesLevelLocal;
+  wiresLevel?: WiresLevelLocal;
   onLeave?: () => void;
 }
 
@@ -333,7 +342,9 @@ export const GameScreen = ({
   onBgMusicVolumeChange,
   challengeName,
   rolesLevel,
+  wiresLevel, //added by KB 7.20.26
   onLeave,
+
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -1154,6 +1165,28 @@ export const GameScreen = ({
               }
               return null;
             })()}
+
+            {/* Added by KB 7.20.26: Wires level: endpoints + wires */}
+            {currentLevel === "wires" && wiresLevel && (
+              <>
+                {wiresLevel.endpoints.map((ep) => (
+                  <mesh key={ep.id} position={getVisualPos(ep.x, ep.y, -1.85)}>
+                    <sphereGeometry args={[0.3, 16, 16]} />
+                    <meshStandardMaterial color={ep.color === "RED" ? "#f87171" : ep.color === "GREEN" ? "#4ade80" : ep.color === "BLUE" ? "#38bdf8" : "#ffffff"} />
+                  </mesh>
+                ))}
+                {wiresLevel.completedWires.map((wire, i) => (
+                  <Wire
+                    key={i}
+                    points={wire.points.map((p) => ({ x: p.x, y: p.y }))}
+                    color={wire.color}
+                    gridWidth={gridWidth}
+                    gridHeight={gridHeight}
+                    spacing={SPACING}
+                  />
+                ))}
+              </>
+            )}
 
             {/* Roles level: confirmation tile (Monitor only) */}
             {currentLevel === "roles" && rolesLevel?.confirmationVisible && viewingRole === "MONITOR" && (

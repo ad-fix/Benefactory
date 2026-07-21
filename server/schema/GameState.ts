@@ -50,6 +50,25 @@ export class RolesLevelState extends Schema {
   @type({ map: "number" }) flipCooldownByColor = new MapSchema<number>();
 }
 
+//this block added by KB 7.20.26
+export class WireEndpointState extends Schema {
+  @type("number") x: number = 0;
+  @type("number") y: number = 0;
+  @type("string") color: string = "";
+  @type("string") id: string = "";
+}
+
+export class WireState extends Schema {
+  @type("string") color: string = "";
+  @type([PositionState]) points = new ArraySchema<PositionState>();
+}
+
+export class WiresLevelState extends Schema {
+  @type([WireEndpointState]) endpoints = new ArraySchema<WireEndpointState>();
+  @type([WireState]) completedWires = new ArraySchema<WireState>();
+  @type(["string"]) usedEndpointIds = new ArraySchema<string>();
+}
+
 export class GameState extends Schema {
   @type("number") gridWidth: number = 10;
   @type("number") gridHeight: number = 8;
@@ -71,4 +90,6 @@ export class GameState extends Schema {
   @type("string") currentLevel: string = "roles";
 
   @type(RolesLevelState) rolesLevel = new RolesLevelState();
+
+  @type(WiresLevelState) wiresLevel = new WiresLevelState(); //added by KB 7.20.26 
 }

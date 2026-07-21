@@ -4,6 +4,7 @@ import { LiveKitService } from "../services/LiveKitService";
 import { BaseLevel } from "../levels/BaseLevel";
 import { RolesLevel } from "../levels/RolesLevel";
 import jwt from "jsonwebtoken";
+import { WiresLevel } from "../levels/WiresLevel"; //added by KB 7.20.26
 
 interface MoveMessage {
   direction: "up" | "down" | "left" | "right";
@@ -74,7 +75,13 @@ export class GameRoom extends Room<GameState> {
     this.state.gridWidth = this.INITIAL_VISIBLE_WIDTH;
     this.state.gridHeight = this.INITIAL_VISIBLE_HEIGHT;
 
-    this.currentLevel = new RolesLevel(this.state);
+    this.state.currentLevel = options.level ?? "roles"; //added by KB 7.20.26
+
+    if (this.state.currentLevel === "wires") {
+      this.currentLevel = new WiresLevel(this.state);
+    } else {
+      this.currentLevel = new RolesLevel(this.state);
+    } 
 
     console.log("Initial state set");
 
@@ -185,6 +192,14 @@ export class GameRoom extends Room<GameState> {
       if (this.currentLevel instanceof RolesLevel) {
         console.log(`[Dev Mode] Manual roles-level stage skip to ${stage}.`);
         this.currentLevel.devSetStage(stage);
+      }
+    });
+
+    // Handle wire drawing (wires level) added by KB 7.20.26
+    this.onMessage("drawWire", (client, message: { color: string; points: { x: number; y: number }[] }) => {
+      if (this.currentLevel instanceof WiresLevel) {
+        console.log(`[WiresLevel] Received drawWire from ${client.sessionId}:`, message);
+        // Real validation logic comes in a later step — this just proves the wire is reachable.
       }
     });
 
