@@ -57,6 +57,8 @@ interface ServerGameState {
   currentLevel: string;
   collectedItems?: Set<string>;
   currentLevelComplete?: boolean;
+  bombDefused?: boolean;
+  bombExploded?: boolean;
   rolesLevel?: {
     stage: number;
     lights: number;
@@ -118,6 +120,8 @@ interface GameStateLocal {
   currentLevel: string;
   collectedItems: Set<string>;
   currentLevelComplete: boolean;
+  bombDefused?: boolean;
+  bombExploded?: boolean; 
   rolesLevel: RolesLevelLocal;
 }
 
@@ -136,6 +140,8 @@ const initialGameState: GameStateLocal = {
   currentLevel: "roles",
   collectedItems: new Set(),
   currentLevelComplete: false,
+  bombDefused: false,
+  bombExploded: false,
   rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map() },
 };
 
@@ -284,6 +290,8 @@ const Index = () => {
         currentLevel: gameRoom.state.currentLevel || "roles",
         collectedItems: gameRoom.state.collectedItems ?? new Set(),
         currentLevelComplete: gameRoom.state.currentLevelComplete ?? false,
+        bombDefused: gameRoom.state.bombDefused ?? false,
+        bombExploded: gameRoom.state.bombExploded ?? false,
         rolesLevel: {
           stage: rl?.stage ?? 1,
           lights: rl?.lights ?? 0,
@@ -436,6 +444,7 @@ const Index = () => {
               userId: initPayload.userId,
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
+              // testLevel: "level1", // for testing
               
             });
 
@@ -730,7 +739,10 @@ const Index = () => {
         <ResultsOverlay
           stage={gameState.stage}
           soloMode={initPayload?.soloMode || false}
-          reason="gameover"
+           reason={
+          gameState.bombDefused ? "bomb_defused" :
+          gameState.bombExploded ? "bomb_exploded" :
+          "gameover"}
           returnUrl={returnUrl}
           players={Array.from(gameState.players.values()).map((p) => ({
             name: p.name,

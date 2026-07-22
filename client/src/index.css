@@ -70,16 +70,16 @@ All colors MUST be HSL.
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Game shell (also in `.dark`); defined here so `bg-canvas` never resolves empty if `class="dark"` is missing */
-    --canvas: 226 48% 4%;
+    --canvas: 234 52% 10%;
     --canvas-elevated: 224 36% 8%;
-    --hairline: 218 16% 22%;
+    --hairline: 170 55% 63%;
   }
 
   .dark {
     /* Very dark blue void + technical hairlines (brutalist / dark shell) */
-    --canvas: 226 48% 4%;
+    --canvas: 234 52% 10%;
     --canvas-elevated: 224 36% 8%;
-    --hairline: 218 16% 22%;
+    --hairline: 170 55% 63%;
 
     --background: 226 48% 4%;
     --foreground: 218 14% 94%;
