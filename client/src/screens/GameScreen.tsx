@@ -34,6 +34,7 @@ import {
   getPlayerUiLabelHex,
   PLAYER_HEX,
 } from "@/constants/playerColors";
+import { WiresFloor } from "@/levels/wires/WiresFloor";
 
 // Types
 type PlayerColor = "RED" | "GREEN" | "BLUE";
@@ -78,11 +79,12 @@ interface RolesLevelLocal {
   flipCooldownByColor: Map<string, number>;
 }
 
-//added by KB 7.20
+//updated by KB 7.21
 interface WiresLevelLocal {
   endpoints: { id: string; x: number; y: number; color: string }[];
   completedWires: { color: string; points: { x: number; y: number }[] }[];
   usedEndpointIds: string[];
+  solved: boolean;
 }
 
 interface Ping {
@@ -642,6 +644,7 @@ export const GameScreen = ({
   return (
     <div className="isolate w-full h-screen relative overflow-hidden bg-canvas">
       {/* Cloud nebula backdrop is rendered inside the R3F Canvas (NebulaBackdrop). */}
+      {/* Commented out to get rid of background smokey effect KB 7.21
       <div
         className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-canvas/25 via-transparent to-transparent"
         aria-hidden
@@ -650,11 +653,12 @@ export const GameScreen = ({
         className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_100%_70%_at_50%_45%,transparent_35%,hsl(222_45%_6%/0.35)_100%)]"
         aria-hidden
       />
+      */}
       {/* NOTE: PolarAmbientParticlesCanvas & NoiseBlobFieldCanvas removed —
            hidden behind opaque R3F Canvas (z-[1]), wasted WebGL contexts.
            NoiseFieldOverlay + ScoreBurstOverlay moved AFTER the R3F Canvas below. */}
       {/* HUD: frosted polar chrome (match timer / stage chips); settings swap into same shell */}
-      <div className="absolute left-4 top-4 z-20 flex w-[min(11.5rem,calc(100vw-2rem))] flex-col gap-2">
+      <div className="absolute left-4 top-4 z-20 flex w-[min(13rem,calc(100vw-2rem))] flex-col gap-2">
         <div
           className="relative flex flex-col overflow-hidden rounded-none border border-solid bg-canvas/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px]"
           style={{ borderColor: POLAR_HUD.border }}
@@ -778,6 +782,8 @@ export const GameScreen = ({
                     Solo mode
                   </p>
                 </div>
+                </div>
+                {/* Commented out in order to adjust the top left info panel KB 7.21
                 <div className="grid min-w-0 gap-1">
                   <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Color
@@ -805,9 +811,17 @@ export const GameScreen = ({
                     </p>
                   </div>
                 )}
-              </div>
+              */}
 
               <div className="relative z-10 flex min-h-10 w-full shrink-0 flex-nowrap items-center justify-between gap-x-2 border-t border-white/10 px-3 py-2">
+                <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
+                  <span className="min-w-0 truncate text-[11px] leading-snug text-slate-500">
+                    Click-Drag to Begin
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5"></div>
+
+                {/* Commented out to take away TAB indicator and replace with relevant info^ in top left panel KB 7.21
                 <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
                   <kbd
                     className="inline-flex shrink-0 items-center rounded-none border border-solid bg-canvas/50 px-1.5 py-0.5 font-montreal text-[9px] font-medium uppercase tracking-[0.1em] text-slate-400"
@@ -819,7 +833,10 @@ export const GameScreen = ({
                     Switch player
                   </span>
                 </div>
+                */}
+
                 <div className="flex shrink-0 items-center gap-0.5">
+                  {/* Commented out to take away Info button in top left panel KB 7.21
                   <button
                     type="button"
                     onClick={() => setControlsOpen(v => !v)}
@@ -830,6 +847,8 @@ export const GameScreen = ({
                   >
                     <Info className="size-3.5" strokeWidth={1.65} aria-hidden />
                   </button>
+                  */}
+
                   <button
                     type="button"
                     onClick={openSettings}
@@ -966,7 +985,7 @@ export const GameScreen = ({
                 {challengeName}
               </p>
             ) : null}
-            <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">Stage</p>
+            <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">Level</p>
             <p className="font-montreal text-3xl font-bold leading-tight tracking-[-0.02em] text-white">{stage}</p>
           </div>
         </div>
@@ -1066,7 +1085,7 @@ export const GameScreen = ({
           });
         }}
       >
-        <NebulaBackdrop />
+        {/* <NebulaBackdrop /> Commented out to get rid of background smokey effect KB 7.21 */}
 
         <OrthographicCamera
           makeDefault
@@ -1087,7 +1106,9 @@ export const GameScreen = ({
 
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
 
+            
             {/* Players */}
+            {/* Commented out to remove original Polar Winds player shapes KB 7.21 
             {Array.from(players.values()).map((player, index) => {
               if (currentLevel === "roles") {
                 if (isSoloMode && index !== activePlayerIndex) return null;
@@ -1112,6 +1133,7 @@ export const GameScreen = ({
                 />
               );
             })}
+            */}
 
             {/* Roles level: Monitor-only Operator onion-skin ghost (stage 4) */}
             {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" && (() => {
@@ -1169,13 +1191,29 @@ export const GameScreen = ({
             {/* Added by KB 7.20.26: Wires level: endpoints + wires */}
             {currentLevel === "wires" && wiresLevel && (
               <>
+                <WiresFloor
+                  room={room}
+                  gridWidth={gridWidth}
+                  gridHeight={gridHeight}
+                  spacing={SPACING}
+                  endpoints={wiresLevel.endpoints}
+                />
                 {wiresLevel.endpoints.map((ep) => (
                   <mesh key={ep.id} position={getVisualPos(ep.x, ep.y, -1.85)}>
                     <sphereGeometry args={[0.3, 16, 16]} />
-                    <meshStandardMaterial color={ep.color === "RED" ? "#f87171" : ep.color === "GREEN" ? "#4ade80" : ep.color === "BLUE" ? "#38bdf8" : "#ffffff"} />
+                    <meshStandardMaterial color={
+                      ep.color === "RED" ? "#f87171" :
+                      ep.color === "GREEN" ? "#4ade80" :
+                      ep.color === "BLUE" ? "#38bdf8" :
+                      ep.color === "YELLOW" ? "#fbbf24" :
+                      ep.color === "PURPLE" ? "#c084fc" :
+                      "#ffffff"
+                    } />
                   </mesh>
                 ))}
-                {wiresLevel.completedWires.map((wire, i) => (
+
+              
+                {wiresLevel.completedWires.map((wire, i) => (                  
                   <Wire
                     key={i}
                     points={wire.points.map((p) => ({ x: p.x, y: p.y }))}
@@ -1240,6 +1278,14 @@ export const GameScreen = ({
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
 
       {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} room={room} />}
+
+      {currentLevel === "wires" && wiresLevel?.solved && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+          <div className="rounded-lg border border-white/20 bg-black/85 px-8 py-4 text-2xl font-bold text-white">
+            Level Solved!
+          </div>
+        </div>
+      )}
 
       {/* Leave confirmation dialog */}
       {showLeaveConfirm && (

@@ -195,11 +195,11 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
-    // Handle wire drawing (wires level) added by KB 7.20.26
+    // Handle wire drawing (wires level) updated by KB 7.21.26
     this.onMessage("drawWire", (client, message: { color: string; points: { x: number; y: number }[] }) => {
       if (this.currentLevel instanceof WiresLevel) {
-        console.log(`[WiresLevel] Received drawWire from ${client.sessionId}:`, message);
-        // Real validation logic comes in a later step — this just proves the wire is reachable.
+        const success = this.currentLevel.submitWire(message.points, message.color);
+        console.log(`[WiresLevel] drawWire from ${client.sessionId}: ${success ? "ACCEPTED" : "REJECTED"}`);
       }
     });
 

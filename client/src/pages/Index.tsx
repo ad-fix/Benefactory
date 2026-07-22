@@ -75,6 +75,7 @@ interface ServerGameState {
     endpoints: Map<string, { id: string; x: number; y: number; color: string }>;
     completedWires: Map<string, { color: string; points: Map<string, { x: number; y: number }> }>;
     usedEndpointIds: Map<string, string>;
+    solved: boolean;
   };
 }
 
@@ -111,6 +112,7 @@ interface WiresLevelLocal {
   endpoints: { id: string; x: number; y: number; color: string }[];
   completedWires: { color: string; points: { x: number; y: number }[] }[];
   usedEndpointIds: string[];
+  solved: boolean;
 }
 
 // Batched game state — updated atomically via reducer
@@ -143,7 +145,7 @@ const initialGameState: GameStateLocal = {
   seed: 0,
   currentLevel: "roles",
   rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map() },
-  wiresLevel: { endpoints: [], completedWires: [], usedEndpointIds: [] }, //added by KB 7.20
+  wiresLevel: { endpoints: [], completedWires: [], usedEndpointIds: [], solved: false }, //added by KB 7.20
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -291,6 +293,7 @@ const Index = () => {
     });
     const usedEndpointIds: string[] = [];
     wl?.usedEndpointIds?.forEach((id) => usedEndpointIds.push(id));
+    const solved = wl?.solved ?? false;
 
     dispatch({
       type: "SYNC_STATE",
@@ -322,11 +325,12 @@ const Index = () => {
           engineerSwitchY: rl?.engineerSwitchY ?? -1,
           flipCooldownByColor,
         },
-        //added by KB 7.20.26
+        //updated by KB 7.21.26
         wiresLevel: {
           endpoints,
           completedWires,
           usedEndpointIds,
+          solved,
         },
       },
     });

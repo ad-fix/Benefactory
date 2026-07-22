@@ -67,6 +67,7 @@ export class WiresLevelState extends Schema {
   @type([WireEndpointState]) endpoints = new ArraySchema<WireEndpointState>();
   @type([WireState]) completedWires = new ArraySchema<WireState>();
   @type(["string"]) usedEndpointIds = new ArraySchema<string>();
+  @type("boolean") solved: boolean = false;
 }
 
 export class GameState extends Schema {
