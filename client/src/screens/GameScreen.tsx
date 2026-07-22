@@ -1081,7 +1081,6 @@ const showPopup = (imageUrl: string, label: string) => {
           });
         }}
       >
-        <NebulaBackdrop />
 
         <OrthographicCamera
           makeDefault
