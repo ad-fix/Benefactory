@@ -658,7 +658,7 @@ export const GameScreen = ({
            hidden behind opaque R3F Canvas (z-[1]), wasted WebGL contexts.
            NoiseFieldOverlay + ScoreBurstOverlay moved AFTER the R3F Canvas below. */}
       {/* HUD: frosted polar chrome (match timer / stage chips); settings swap into same shell */}
-      <div className="absolute left-4 top-4 z-20 flex w-[min(13rem,calc(100vw-2rem))] flex-col gap-2">
+      <div className="absolute left-4 top-4 z-20 flex w-[min(19rem,calc(100vw-2rem))] flex-col gap-2">
         <div
           className="relative flex flex-col overflow-hidden rounded-none border border-solid bg-canvas/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px]"
           style={{ borderColor: POLAR_HUD.border }}
@@ -819,7 +819,28 @@ export const GameScreen = ({
                     Click-Drag to Begin
                   </span>
                 </div>
-                <div className="flex shrink-0 items-center gap-0.5"></div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  {currentLevel === "wires" && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => room?.send("undoWire", {})}
+                        title="Undo last wire"
+                        className="rounded-none border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-300 transition-colors hover:bg-white/10"
+                      >
+                        Undo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => room?.send("resetWiresLevel", {})}
+                        title="Reset level"
+                        className="rounded-none border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-300 transition-colors hover:bg-white/10"
+                      >
+                        Reset
+                      </button>
+                    </>
+                  )}
+                </div>
 
                 {/* Commented out to take away TAB indicator and replace with relevant info^ in top left panel KB 7.21
                 <div className="flex min-w-0 flex-1 items-center gap-x-1.5">

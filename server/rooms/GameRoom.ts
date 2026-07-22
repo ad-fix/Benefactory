@@ -78,10 +78,13 @@ export class GameRoom extends Room<GameState> {
     this.state.currentLevel = options.level ?? "roles"; //added by KB 7.20.26
 
     if (this.state.currentLevel === "wires") {
+      this.state.gridWidth = 7;
+      this.state.gridHeight = 6;
+      this.state.timeRemaining = 5 * 60; // Added by KB 7.22 - 5 minutes for wires level
       this.currentLevel = new WiresLevel(this.state);
     } else {
       this.currentLevel = new RolesLevel(this.state);
-    } 
+    }
 
     console.log("Initial state set");
 
@@ -200,6 +203,18 @@ export class GameRoom extends Room<GameState> {
       if (this.currentLevel instanceof WiresLevel) {
         const success = this.currentLevel.submitWire(message.points, message.color);
         console.log(`[WiresLevel] drawWire from ${client.sessionId}: ${success ? "ACCEPTED" : "REJECTED"}`);
+      }
+    });
+
+    this.onMessage("undoWire", (client) => {
+      if (this.currentLevel instanceof WiresLevel) {
+        this.currentLevel.undoLastWire();
+      }
+    });
+
+    this.onMessage("resetWiresLevel", (client) => {
+      if (this.currentLevel instanceof WiresLevel) {
+        this.currentLevel.resetLevel();
       }
     });
 
@@ -621,7 +636,7 @@ export class GameRoom extends Room<GameState> {
           clearInterval(this.countdownTimer);
           this.countdownTimer = null;
         }
-        this.state.timeRemaining = this.GAME_DURATION;
+        this.state.timeRemaining = this.state.currentLevel === "wires" ? 5 * 60 : this.GAME_DURATION;
         this.gameStartTime = Date.now();
         this.startGameTimer();
         console.log("Countdown complete — game timer started!");
