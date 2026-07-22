@@ -157,6 +157,31 @@ export class GameRoom extends Room<GameState> {
       player.heldWirecutter = message.wirecutterColor;
       });
 
+      this.onMessage("cutWire", (client, message: { color: string }) => {
+  const player = this.state.players.get(client.sessionId);
+  if (!player) return;
+  if (!player.heldWirecutter) return;                 // must be holding a wirecutter
+  if (this.state.bombDefused || this.state.bombExploded) return; // bomb already resolved
+
+  const CORRECT_WIRES = ["red", "green", "blue"];
+  player.heldWirecutter = "";                          // consumed on any attempt, right or wrong
+
+  if (!CORRECT_WIRES.includes(message.color)) {
+    this.state.bombExploded = true;
+    this.state.isGameOver = true;
+    return;
+  }
+
+  if (!this.state.cutWires.includes(message.color)) {
+    this.state.cutWires.push(message.color);
+  }
+
+  if (this.state.cutWires.length === CORRECT_WIRES.length) {
+    this.state.bombDefused = true;
+    this.state.isGameOver = true;
+  }
+  });
+
     // Handle ping - just broadcast to all clients, don't store in state
     this.onMessage("ping", (client, message: PingMessage) => {
       const player = this.state.players.get(client.sessionId);
@@ -199,6 +224,14 @@ export class GameRoom extends Room<GameState> {
         console.log(`[Dev Mode] Manual roles-level stage skip to ${stage}.`);
         this.currentLevel.devSetStage(stage);
       }
+    });
+
+    // Giving wirecutters for testing bomb wire cutting
+    this.onMessage("devGiveWirecutter", (client, message: { color: string }) => {
+      if (!this.isDevMode) return;
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      player.heldWirecutter = message.color;
     });
 
     // Handle dev role switcher
@@ -718,6 +751,7 @@ export class GameRoom extends Room<GameState> {
     }
 
     this.state.isGameOver = true;
+    this.state.bombExploded = true;
 
     console.log("Game ended!");
 

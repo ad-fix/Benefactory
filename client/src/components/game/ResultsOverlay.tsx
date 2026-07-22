@@ -16,7 +16,7 @@ interface PlayerInfo {
 export interface ResultsOverlayProps {
   stage: number;
   soloMode: boolean;
-  reason: "gameover" | "abandoned";
+  reason: "gameover" | "abandoned" | "bomb_defused" | "bomb_exploded";
   returnUrl?: string | null;
   onBack: () => void;
   players?: PlayerInfo[];
@@ -58,19 +58,31 @@ export const ResultsOverlay = ({
       >
         <HudCornerLs />
         <div className="relative z-[1]">
-          <header className="mb-5 border-b border-white/10 pb-5 text-center">
-            <p className="font-montreal text-[9px] font-medium uppercase tracking-[0.14em] text-slate-400">
-              {reason === "abandoned" ? "Session status" : "Run complete"}
-            </p>
-            <h1
-              id="results-overlay-title"
-              className="mt-2 font-montreal text-2xl font-bold tracking-tight text-white"
-            >
-              {reason === "abandoned" ? "Game abandoned" : "Game over"}
-            </h1>
-          </header>
+         <header className="mb-5 border-b border-white/10 pb-5 text-center">
+  <p className="font-sans text-[12px] font-medium uppercase tracking-[0.14em] text-slate-400">
+    {reason === "abandoned" ? "Session status" :
+     reason === "bomb_defused" ? "The factory was saved!" :
+     reason === "bomb_exploded" ? "The factory was destroyed..." :
+     "Run complete"}
+  </p>
+  <h1
+    id="results-overlay-title"
+    className={cn(
+      "mt-2 font-sans text-2xl font-bold tracking-tight",
+      reason === "bomb_defused" ? "text-emerald-300" :
+      reason === "bomb_exploded" ? "text-red-400" :
+      "text-white"
+    )}
+  >
+    {reason === "abandoned" ? "Game abandoned." :
+     reason === "bomb_defused" ? "The bomb was defused!" :
+     reason === "bomb_exploded" ? "Boom!" :
+     "Game over"}
+  </h1>
+</header>
 
-          <div className="overflow-hidden rounded-none border border-solid ring-1 ring-inset ring-white/[0.04]" style={{ borderColor: POLAR_HUD.border, background: "rgba(255,255,255,0.03)" }}>
+          <div className="overflow-hidden rounded-none border border-solid ring-1 ring-inset ring-white/[0.04]" 
+          style={{ borderColor: POLAR_HUD.border, background: "rgba(255,255,255,0.03)" }}>
             <div className="flex items-center justify-between gap-4 px-3.5 py-2.5 sm:px-4 sm:py-3">
               <span className={labelCls}>Stage</span>
               <span className="font-montreal text-lg font-bold text-white sm:text-xl">{stage}</span>

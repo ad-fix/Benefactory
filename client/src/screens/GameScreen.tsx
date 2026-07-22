@@ -12,7 +12,6 @@ import { ParticleFloor } from "@/components/ParticleFloor";
 import { useAmbientMusic } from "@/hooks/use-ambient-music";
 import { LEVEL_MUSIC, DEFAULT_LEVEL_MUSIC } from "@/constants/levelMusic";
 // adding in ambient music to levels
-
 import { PulseRipple } from "@/components/game/PulseRipple";
 import { ClickHandler } from "@/components/ClickHandler";
 import { Info, LogOut, Settings, TriangleAlert, Volume2, VolumeX, X } from "lucide-react";
@@ -21,6 +20,7 @@ import { useSounds } from "@/hooks/use-sounds";
 // Removed: PolarAmbientParticlesCanvas, NoiseBlobFieldCanvas — hidden behind opaque R3F canvas, wasted WebGL contexts
 import { InteractablePopup } from "@/components/game/InteractablePopup";
 // adding interactable objects depending on level and stage
+import { WireSelectionModal, type WireColor } from "@/components/game/WireSelectionModal";
 import { InteractableItem } from "@/components/game/InteractableItem";
 import { LEVEL_INTERACTABLES } from "@/constants/levelInteractables";
 import { HudCornerLs, POLAR_HUD } from "@/components/ui/polar-chrome";
@@ -352,6 +352,7 @@ export const GameScreen = ({
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
   useAmbientMusic(LEVEL_MUSIC[currentLevel] ?? DEFAULT_LEVEL_MUSIC);
   const [activePopup, setActivePopup] = useState<{ imageUrl: string; label: string; triggerId: number } | null>(null);
+  const [wireModalOpen, setWireModalOpen] = useState(false);
 const popupCounter = useRef(0);
 
 const showPopup = (imageUrl: string, label: string) => {
@@ -627,6 +628,11 @@ const showPopup = (imageUrl: string, label: string) => {
   const myPlayer = isSoloMode
     ? Array.from(players.values())[activePlayerIndex]
     : Array.from(players.values()).find(p => p.sessionId === room?.sessionId);
+
+    const handleCutWire = (color: WireColor) => {
+  if (!myPlayer?.heldWirecutter || !room) return;
+  room.send("cutWire", { color });
+};
 
   // Role of the player currently controlling/viewing (solo: active player; multiplayer: own role)
   const viewingRole = isSoloMode
@@ -1125,11 +1131,15 @@ const showPopup = (imageUrl: string, label: string) => {
               size={item.size}
               rotation={item.id === "bomb" ? [-Math.PI / 2, 0 , -Math.PI / 2 ] : undefined}
               onInteract={() => {
-  if (item.pickup && room) {
-    room.send("pickupItem", { itemId: item.id, wirecutterColor: item.pickup });
-  }
-  showPopup(item.imageUrl, item.label);
-}}
+              if (item.id === "bomb") {
+                setWireModalOpen(true);
+                return;
+                }
+                if (item.pickup && room) {
+                room.send("pickupItem", { itemId: item.id, wirecutterColor: item.pickup });
+                }
+                showPopup(item.imageUrl, item.label);
+                }}
                 />
               );
             })}
@@ -1271,6 +1281,25 @@ const showPopup = (imageUrl: string, label: string) => {
           ) : null}
         </div>
       </div>
+      
+      <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
+        <div className="flex size-10 items-center justify-center border border-dashed border-white/20">
+          {myPlayer?.heldWirecutter ? (
+            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-8 object-contain" />
+          ) : null}
+        </div>
+      </div>
+
+      {wireModalOpen && (
+        <WireSelectionModal
+          hasWirecutter={!!myPlayer?.heldWirecutter}
+          onSelectWire={(color) => {
+            handleCutWire(color);
+            setWireModalOpen(false);
+          }}
+          onClose={() => setWireModalOpen(false)}
+        />
+      )}
 
          {activePopup && (              
         <InteractablePopup

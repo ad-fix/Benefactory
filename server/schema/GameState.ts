@@ -79,4 +79,8 @@ export class GameState extends Schema {
 
   @type("boolean") currentLevelComplete: boolean = false;
 
+  @type("boolean") bombDefused: boolean = false;
+  @type("boolean") bombExploded: boolean = false;
+  @type({ array: "string" }) cutWires = new ArraySchema<string>();
+
 }
