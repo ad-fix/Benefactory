@@ -556,6 +556,24 @@ const showPopup = (imageUrl: string, label: string) => {
       .map((item) => ({ ...item, absX: minX + item.gridX, absY: minY + item.gridY }));
   }, [currentLevel, collectedItems, rolesLevel?.stage, currentLevelComplete, gridWidth, gridHeight]);
   
+  // camera fix for conveyor
+  const [viewportSize, setViewportSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+useEffect(() => {
+  const onResize = () => setViewportSize({ width: window.innerWidth, height: window.innerHeight });
+  window.addEventListener("resize", onResize);
+  return () => window.removeEventListener("resize", onResize);
+}, []);
+
+const worldToScreenPercent = (worldX: number, worldZ: number) => {
+  const zoom = calcBoardZoom(gridWidth, gridHeight, SPACING, viewportSize.height);
+  const screenXPx = viewportSize.width / 2 + worldX * zoom;
+  const screenYPx = viewportSize.height / 2 + worldZ * zoom;
+  return {
+    leftPercent: (screenXPx / viewportSize.width) * 100,
+    topPercent: (screenYPx / viewportSize.height) * 100,
+  };
+};
+
   // Keyboard controls
   useEffect(() => {
     if (!room || isSpectator || countdown > 0 || isGameOver) return;
@@ -1364,6 +1382,7 @@ const showPopup = (imageUrl: string, label: string) => {
           gridHeight={gridHeight}
           playersConnected={players.size}
           roomId={room?.roomId ?? ""}
+          worldToScreenPercent={worldToScreenPercent}
           >
         <ConveyorLevelView role={myRole ?? ""} />
         </ConveyorLevelProvider>

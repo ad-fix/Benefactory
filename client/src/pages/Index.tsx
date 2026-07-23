@@ -9,7 +9,6 @@ import { usePlatformVoice } from "@/hooks/usePlatformVoice";
 import { useSounds } from "@/hooks/use-sounds";
 import { PlatformVoiceOverlay } from "@/components/game/PlatformVoiceOverlay";
 import { ResultsOverlay } from "@/components/game/ResultsOverlay";
-import { ConveyorLevelProvider } from "@/levels/conveyors/ConveyorLevelView";
 
 /** Build a redirect URL back to the platform with query params */
 function buildReturnUrl(returnUrl: string, params: Record<string, string | number>): string {
@@ -639,13 +638,6 @@ const Index = () => {
 
   return (
     <div className="relative min-h-dvh w-full bg-canvas text-foreground">
-      <ConveyorLevelProvider
-        conveyorLevel={gameState.conveyorLevel}
-        gridWidth={gameState.gridWidth}
-        gridHeight={gameState.gridHeight}
-        playersConnected={gameState.players.size}
-        roomId={room?.roomId ?? ""}
-      >
       <GameScreen
         room={room}
         players={gameState.players}
@@ -671,8 +663,7 @@ const Index = () => {
         conveyorLevel={gameState.conveyorLevel}
         onLeave={handleLeave}
       />
-      </ConveyorLevelProvider>
-      {/* TODO: revert — temporarily showing overlay in solo mode */}
+       {/* TODO: revert — temporarily showing overlay in solo mode */}
       <PlatformVoiceOverlay
         participants={voice.participants}
         isMuted={voice.isMuted}

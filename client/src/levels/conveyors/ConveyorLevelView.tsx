@@ -40,6 +40,7 @@ interface ConveyorLevelContextValue {
   gridHeight: number;
   playersConnected: number;
   roomId: string;
+  worldToScreenPercent: (worldX: number, worldZ: number) => { leftPercent: number; topPercent: number };
 }
 
 const ConveyorLevelContext = createContext<ConveyorLevelContextValue | null>(null);
@@ -58,6 +59,21 @@ const PALETTE = {
   red: "#ef4444",
   green: "#22c55e",
   blue: "#3b82f6",
+};
+
+const SPACING = 2.5;
+
+const gridToWorld = (x: number, y: number, gridWidth: number, gridHeight: number) => {
+  const MAX_GRID = 26;
+  const center = Math.floor(MAX_GRID / 2);
+  const minX = center - Math.floor(gridWidth / 2);
+  const minY = center - Math.floor(gridHeight / 2);
+  const offsetX = (gridWidth - 1) / 2;
+  const offsetY = (gridHeight - 1) / 2;
+  return {
+    worldX: (x - minX - offsetX) * SPACING,
+    worldZ: (y - minY - offsetY) * SPACING,
+  };
 };
 
 const ROLE_THEME: Record<string, { label: string; color: string; glow: string; shape: "square" | "triangle" | "circle" }> = {
@@ -168,29 +184,55 @@ const ConveyorBoard = ({
   conveyorLevel,
   gridWidth,
   gridHeight,
+  worldToScreenPercent,
 }: ConveyorLevelViewProps & ConveyorLevelContextValue) => {
-  const minX = 13 - Math.floor(gridWidth / 2);
-  const minY = 13 - Math.floor(gridHeight / 2);
   const activeTheme = ROLE_THEME[role] ?? ROLE_THEME.OPERATOR;
 
-  const position = (x: number, y: number): CSSProperties => ({
-    left: `${((x - minX + 0.5) / gridWidth) * 100}%`,
-    top: `${((y - minY + 0.5) / gridHeight) * 100}%`,
-  });
-
-  const beltStyle = (belt: ConveyorLocal): CSSProperties => {
-    const horizontal = belt.startY === belt.endY;
-    const localX = Math.min(belt.startX, belt.endX) - minX;
-    const localY = Math.min(belt.startY, belt.endY) - minY;
-    const length = Math.abs(belt.endX - belt.startX) + Math.abs(belt.endY - belt.startY) + 1;
-    const thickness = 0.62;
-    return {
-      left: `${((horizontal ? localX : localX + (1 - thickness) / 2) / gridWidth) * 100}%`,
-      top: `${((horizontal ? localY + (1 - thickness) / 2 : localY) / gridHeight) * 100}%`,
-      width: `${((horizontal ? length : thickness) / gridWidth) * 100}%`,
-      height: `${((horizontal ? thickness : length) / gridHeight) * 100}%`,
-    };
+  const position = (x: number, y: number): CSSProperties => {
+    const { worldX, worldZ } = gridToWorld(x, y, gridWidth, gridHeight);
+    const { leftPercent, topPercent } = worldToScreenPercent(worldX, worldZ);
+    return { left: `${leftPercent}%`, top: `${topPercent}%` };
   };
+
+  const beltWorldBounds = (belt: ConveyorLocal) => {
+    const horizontal = belt.startY === belt.endY;
+    const minGX = Math.min(belt.startX, belt.endX);
+    const maxGX = Math.max(belt.startX, belt.endX);
+    const minGY = Math.min(belt.startY, belt.endY);
+    const maxGY = Math.max(belt.startY, belt.endY);
+    const thicknessCells = 0.62;
+
+    const centerMin = gridToWorld(minGX, minGY, gridWidth, gridHeight);
+    const centerMax = gridToWorld(maxGX, maxGY, gridWidth, gridHeight);
+    const halfCell = SPACING / 2;
+    const halfThickness = (thicknessCells * SPACING) / 2;
+
+    return horizontal
+      ? {
+          worldMinX: centerMin.worldX - halfCell,
+          worldMaxX: centerMax.worldX + halfCell,
+          worldMinZ: centerMin.worldZ - halfThickness,
+          worldMaxZ: centerMin.worldZ + halfThickness,
+        }
+      : {
+          worldMinX: centerMin.worldX - halfThickness,
+          worldMaxX: centerMin.worldX + halfThickness,
+          worldMinZ: centerMin.worldZ - halfCell,
+          worldMaxZ: centerMax.worldZ + halfCell,
+        };
+  };
+
+const beltStyle = (belt: ConveyorLocal): CSSProperties => {
+  const { worldMinX, worldMaxX, worldMinZ, worldMaxZ } = beltWorldBounds(belt);
+  const topLeft = worldToScreenPercent(worldMinX, worldMinZ);
+  const bottomRight = worldToScreenPercent(worldMaxX, worldMaxZ);
+  return {
+    left: `${topLeft.leftPercent}%`,
+    top: `${topLeft.topPercent}%`,
+    width: `${bottomRight.leftPercent - topLeft.leftPercent}%`,
+    height: `${bottomRight.topPercent - topLeft.topPercent}%`,
+  };
+};
 
   const beltsAtItem = useMemo(
     () => new Set(conveyorLevel.conveyors.filter((belt) => beltContainsPoint(belt, conveyorLevel.itemX, conveyorLevel.itemY)).map((belt) => belt.id)),
@@ -204,8 +246,8 @@ const ConveyorBoard = ({
 
   return (
     <div className="pointer-events-none absolute inset-0 z-[30] font-sans text-[#ebe5cf]">
-      <div
-          className="absolute inset-x-[8%] bottom-[8%] top-[17%]">      
+      <div 
+          className="absolute inset-0">      
         <div
           className="absolute inset-0 opacity-1"
           style={{
