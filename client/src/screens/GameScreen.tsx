@@ -28,15 +28,14 @@ import { NoiseFieldOverlay, type NoiseFieldHandle } from "@/components/game/Nois
 import { StageAnnouncement } from "@/components/game/StageAnnouncement";
 import { DevStageControls } from "@/components/game/DevStageControls";
 import { GameControls } from "@/components/game/GameControls";
-import { NebulaBackdrop } from "@/components/game/NebulaBackdrop";
 import { RolesLevelView } from "@/levels/roles/RolesLevelView";
-import { ConveyorLevelView } from "@/levels/conveyors/ConveyorLevelView";
 import { ButtonDot } from "@/levels/roles/ButtonDot";
 import { ConfirmationTile } from "@/levels/roles/ConfirmationTile";
 import { SwitchTile } from "@/levels/roles/SwitchTile";
 import { StageLights } from "@/levels/roles/StageLights";
 import { OperatorGhost } from "@/levels/roles/OperatorGhost";
 import { GhostButton } from "@/levels/roles/GhostButton";
+import { ConveyorLevelView, ConveyorLevelProvider } from "@/levels/conveyors/ConveyorLevelView";
 import {
   getFloorTint,
   getPlayerDisplayLabel,
@@ -1305,14 +1304,6 @@ const showPopup = (imageUrl: string, label: string) => {
       <NoiseFieldOverlay ref={noiseFieldRef} resolutionScale={0.8} />
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
-
-      <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
-        <div className="flex size-10 items-center justify-center border border-dashed border-white/20">
-          {myPlayer?.heldWirecutter ? (
-            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-8 object-contain" />
-          ) : null}
-        </div>
-      </div>
       
       <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
         <div className="flex size-10 items-center justify-center border border-dashed border-white/20">
@@ -1343,7 +1334,17 @@ const showPopup = (imageUrl: string, label: string) => {
       )}
 
       {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} room={room} />}
-      {currentLevel === "conveyors" && conveyorLevel && <ConveyorLevelView role={myRole ?? ""} />}
+      {currentLevel === "conveyor" && conveyorLevel && (
+        <ConveyorLevelProvider
+          conveyorLevel={conveyorLevel}
+          gridWidth={gridWidth}
+          gridHeight={gridHeight}
+          playersConnected={players.size}
+          roomId={room?.roomId ?? ""}
+          >
+        <ConveyorLevelView role={myRole ?? ""} />
+        </ConveyorLevelProvider>
+        )}
 
       {/* Leave confirmation dialog */}
       {showLeaveConfirm && (
@@ -1361,11 +1362,11 @@ const showPopup = (imageUrl: string, label: string) => {
             <div className="relative z-[1] flex flex-col gap-1.5">
               <p
                 id="leave-dialog-title"
-                className="font-montreal text-sm font-semibold text-white"
+                className="font-sans text-sm font-semibold text-white"
               >
                 Leave game?
               </p>
-              <p className="font-montreal text-xs text-slate-400">
+              <p className="font-sans text-xs text-slate-400">
                 Are you sure you want to leave this game?
               </p>
             </div>

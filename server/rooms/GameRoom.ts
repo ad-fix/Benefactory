@@ -76,8 +76,8 @@ export class GameRoom extends Room<GameState> {
     this.state.gridWidth = this.INITIAL_VISIBLE_WIDTH;
     this.state.gridHeight = this.INITIAL_VISIBLE_HEIGHT;
 
-    if (options.testLevel === "conveyors") {
-  this.state.currentLevel = "conveyors";
+    if (options.testLevel === "conveyor") {
+  this.state.currentLevel = "conveyor";
   this.currentLevel = new ConveyorLevel(this.state);
 } else if (options.testLevel === "level1") {
   this.state.currentLevel = "level1";

@@ -498,7 +498,7 @@ const Index = () => {
               userId: initPayload.userId,
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
-             // testLevel: "conveyors", // temporary conveyor testing
+             testLevel: "conveyor", // temporary conveyor testing
               
             });
 

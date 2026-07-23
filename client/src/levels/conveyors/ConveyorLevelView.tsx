@@ -205,19 +205,16 @@ const ConveyorBoard = ({
   );
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-[30] font-mono text-[#ebe5cf]">
+    <div className="pointer-events-none absolute inset-0 z-[30] font-sans text-[#ebe5cf]">
       <div
-        className="absolute inset-x-[8%] bottom-[8%] top-[17%] border border-[#ebe5cf]/20 bg-black/90 shadow-[0_0_50px_rgba(0,0,0,.75)]"
-      >
+          className="absolute inset-x-[8%] bottom-[8%] top-[17%]">      
         <div
-          className="absolute inset-0 opacity-35"
+          className="absolute inset-0 opacity-1"
           style={{
             backgroundImage: "linear-gradient(rgba(235,229,207,.1) 1px,transparent 1px),linear-gradient(90deg,rgba(235,229,207,.1) 1px,transparent 1px)",
             backgroundSize: `${100 / gridWidth}% ${100 / gridHeight}%`,
           }}
         />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_15%,rgba(0,0,0,.6)_100%)]" />
-
         {conveyorLevel.conveyors.map((belt) => {
           const theme = ROLE_THEME[belt.owner] ?? ROLE_THEME.OPERATOR;
           const horizontal = belt.startY === belt.endY;
@@ -233,7 +230,7 @@ const ConveyorBoard = ({
                 backgroundSize: horizontal ? "auto,15px 100%,auto" : "auto,100% 15px,auto",
                 borderColor: atItem && owned ? PALETTE.cream : theme.color,
                 borderWidth: owned ? 2 : 1,
-                opacity: owned || atItem ? 1 : 0.5,
+                opacity: owned || atItem ? 1 : 0.8,
                 boxShadow: atItem
                   ? `0 0 20px ${theme.glow},inset 0 0 15px rgba(0,0,0,.7)`
                   : owned
