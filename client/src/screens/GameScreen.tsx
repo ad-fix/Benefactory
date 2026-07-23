@@ -35,7 +35,7 @@ import { SwitchTile } from "@/levels/roles/SwitchTile";
 import { StageLights } from "@/levels/roles/StageLights";
 import { OperatorGhost } from "@/levels/roles/OperatorGhost";
 import { GhostButton } from "@/levels/roles/GhostButton";
-import { ConveyorLevelView, ConveyorLevelProvider } from "@/levels/conveyors/ConveyorLevelView";
+import { ConveyorLevelView, ConveyorLevelProvider, ROLE_THEME, RoleMark } from "@/levels/conveyors/ConveyorLevelView";
 import {
   getFloorTint,
   getPlayerDisplayLabel,
@@ -543,7 +543,12 @@ const showPopup = (imageUrl: string, label: string) => {
     }
   }, [activePlayerIndex, isSoloMode, players]);
 
-  const positionedInteractables = useMemo(() => {
+    const CONVEYOR_SPAWN_TILES: [number, number][] = [
+     [12, 26], // TODO: replace with real coordinates
+     [13, 26], // TODO: replace with real coordinates
+     ];
+
+    const positionedInteractables = useMemo(() => {
     const MAX_GRID = 26;
     const center = Math.floor(MAX_GRID / 2);
     const minX = center - Math.floor(gridWidth / 2);
@@ -716,6 +721,23 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
   if (!myPlayer?.heldWirecutter || !room) return;
   room.send("cutWire", { color });
 };
+
+  const lastHintTileRef = useRef<string | null>(null);
+    useEffect(() => {
+      if (!myPlayer) return;
+  const checkX = predictedPos && currentLevel !== "conveyor" ? predictedPos.x : myPlayer.x;
+  const checkY = predictedPos && currentLevel !== "conveyor" ? predictedPos.y : myPlayer.y;
+
+  const onItem = positionedInteractables.find(
+    (item) => item.pickup && item.absX === checkX && item.absY === checkY
+  );
+  const tileKey = onItem ? `${checkX},${checkY}` : null;
+
+  if (tileKey && tileKey !== lastHintTileRef.current) {
+    showPopup(onItem!.imageUrl, "Press E to pick up");
+  }
+  lastHintTileRef.current = tileKey;
+}, [myPlayer, predictedPos, currentLevel, positionedInteractables]);
 
   // Role of the player currently controlling/viewing (solo: active player; multiplayer: own role)
   const viewingRole = isSoloMode
@@ -1224,9 +1246,15 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
               }
               const isMe = isSoloMode ? index === activePlayerIndex : player.color === myColor;
               // Use predicted position for local player in multiplayer
-              const playerX = isMe && predictedPos ? predictedPos.x : player.x;
-              const playerY = isMe && predictedPos ? predictedPos.y : player.y;
-              const pos = getVisualPos(playerX, playerY, -1.5);
+              const playerX = isMe && predictedPos && currentLevel !== "conveyor" ? predictedPos.x : player.x;
+              const playerY = isMe && predictedPos && currentLevel !== "conveyor" ? predictedPos.y : player.y;
+              const isConveyorSpawnTile =
+              currentLevel === "conveyor" &&
+              CONVEYOR_SPAWN_TILES.some(([sx, sy]) => sx === playerX && sy === playerY);
+
+              const pos = currentLevel === "conveyor" && !isConveyorSpawnTile
+              ? getVisualPos(CONVEYOR_SPAWN_TILES[index % CONVEYOR_SPAWN_TILES.length][0], CONVEYOR_SPAWN_TILES[index % CONVEYOR_SPAWN_TILES.length][1], -1.5)
+              : getVisualPos(playerX, playerY, -1.5);
               const slowedUntil = currentLevel === "roles"
                 ? rolesLevel?.slowedUntilBySession?.get(player.sessionId)
                 : undefined;
@@ -1346,6 +1374,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
       
+      {/*inventory*/}
       <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
         <div className="flex size-10 items-center justify-center border border-dashed border-white/20">
           {myPlayer?.heldWirecutter ? (

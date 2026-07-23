@@ -76,7 +76,7 @@ const gridToWorld = (x: number, y: number, gridWidth: number, gridHeight: number
   };
 };
 
-const ROLE_THEME: Record<string, { label: string; color: string; glow: string; shape: "square" | "triangle" | "circle" }> = {
+export const ROLE_THEME: Record<string, { label: string; color: string; glow: string; shape: "square" | "triangle" | "circle" }> = {
   ENGINEER: { label: "Engineer", color: PALETTE.red, glow: "rgba(239,68,68,0.55)", shape: "square" },
   MONITOR: { label: "Monitor", color: PALETTE.green, glow: "rgba(34,197,94,0.55)", shape: "triangle" },
   OPERATOR: { label: "Operator", color: PALETTE.blue, glow: "rgba(59,130,246,0.55)", shape: "circle" },
@@ -93,7 +93,7 @@ const conveyorSurface = (horizontal: boolean, color: string) => horizontal
   ? `linear-gradient(to bottom, ${color} 0 7%, rgba(0,0,0,.58) 7% 12%, transparent 12% 88%, rgba(0,0,0,.58) 88% 93%, ${color} 93%), repeating-linear-gradient(90deg, rgba(235,229,207,.13) 0 2px, rgba(235,229,207,.025) 2px 8px, rgba(0,0,0,.2) 8px 15px), linear-gradient(#555b58,#202421)`
   : `linear-gradient(to right, ${color} 0 7%, rgba(0,0,0,.58) 7% 12%, transparent 12% 88%, rgba(0,0,0,.58) 88% 93%, ${color} 93%), repeating-linear-gradient(0deg, rgba(235,229,207,.13) 0 2px, rgba(235,229,207,.025) 2px 8px, rgba(0,0,0,.2) 8px 15px), linear-gradient(90deg,#555b58,#202421)`;
 
-const RoleMark = ({ role }: { role: string }) => {
+export const RoleMark = ({ role }: { role: string }) => {
   const theme = ROLE_THEME[role] ?? ROLE_THEME.OPERATOR;
   if (theme.shape === "triangle") {
     return (
@@ -306,25 +306,6 @@ const beltStyle = (belt: ConveyorLocal): CSSProperties => {
         >
           {conveyorLevel.complete ? <Scissors className="size-6" /> : <Package className="size-6" />}
         </div>
-      </div>
-
-      <section className="absolute right-[9%] top-4 flex max-w-[44vw] items-center gap-2 border border-[#ebe5cf]/20 bg-[#213242]/95 px-3 py-2 shadow-xl lg:gap-4 lg:px-4">
-        <Factory className="size-5 text-[#ebe5cf]" />
-        <div>
-          <p className="hidden text-[9px] uppercase tracking-[.22em] text-[#ebe5cf]/50 lg:block">Benefactory production floor</p>
-          <p className="text-sm font-black uppercase tracking-[.12em]">Phase {conveyorLevel.stage} / 3</p>
-        </div>
-        <div className="h-8 w-px bg-[#ebe5cf]/15" />
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider" style={{ color: activeTheme.color }}>
-          <RoleMark role={role} /> {activeTheme.label}
-        </div>
-      </section>
-
-      <div className="absolute bottom-[2.5%] left-1/2 flex -translate-x-1/2 items-center gap-4 border border-[#ebe5cf]/15 bg-black/75 px-4 py-1.5 text-[9px] uppercase tracking-wider text-[#ebe5cf]/65">
-        <span>WASD / arrows run your belts</span>
-        {Object.entries(ROLE_THEME).map(([key, theme]) => (
-          <span key={key} className="flex items-center gap-1.5" style={{ color: theme.color }}><RoleMark role={key} /> {theme.label}</span>
-        ))}
       </div>
 
       {conveyorLevel.complete && (
