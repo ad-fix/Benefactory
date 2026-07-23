@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
 const COLOR_MAP: Record<string, string> = {
@@ -33,24 +34,45 @@ interface ButtonDotProps {
   // Engineer view only: the matched operator button's current behaviorType.
   // Presence of this prop marks the button as an engineer button.
   matchedBehaviorType?: string;
+  // Engineer view, stage 4 only: timestamp (ms) until which this color's flip
+  // is on cooldown — dims the whole button while in the future.
+  cooldownUntil?: number;
 }
 
-export const ButtonDot = ({ button, position, matchedBehaviorType }: ButtonDotProps) => {
+export const ButtonDot = ({ button, position, matchedBehaviorType, cooldownUntil }: ButtonDotProps) => {
   const hex = COLOR_MAP[button.color] ?? "#ffffff";
   const auraTexture = useMemo(() => makeAuraTexture(hex), [hex]);
 
-  // Operator: aura tracks isActive. Engineer: aura tracks matched operator's behaviorType.
-  const showAura = matchedBehaviorType !== undefined
+  // Operator: lit tracks isActive. Engineer: lit tracks matched operator's behaviorType.
+  const isLit = matchedBehaviorType !== undefined
     ? matchedBehaviorType === "TOGGLE"
     : button.isActive;
+
+  const mainMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const auraMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
+
+  const baseEmissiveIntensity = isLit ? 1.5 : 0.15;
+  const baseOpacity = isLit ? 1 : 0.45;
+
+  useFrame(() => {
+    const isLocked = !!cooldownUntil && Date.now() < cooldownUntil;
+    if (mainMaterialRef.current) {
+      mainMaterialRef.current.emissiveIntensity = isLocked ? baseEmissiveIntensity * 0.45 : baseEmissiveIntensity;
+      mainMaterialRef.current.opacity = isLocked ? baseOpacity * 0.6 : baseOpacity;
+    }
+    if (auraMaterialRef.current) {
+      auraMaterialRef.current.opacity = isLocked ? 0.5 : 1;
+    }
+  });
 
   return (
     <>
       {/* Soft aura — radial gradient plane, additive blending, no hard edge */}
-      {showAura && (
+      {isLit && (
         <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[2.4, 2.4]} />
           <meshBasicMaterial
+            ref={auraMaterialRef}
             map={auraTexture}
             transparent
             blending={THREE.AdditiveBlending}
@@ -63,10 +85,11 @@ export const ButtonDot = ({ button, position, matchedBehaviorType }: ButtonDotPr
       <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.5, 32]} />
         <meshStandardMaterial
+          ref={mainMaterialRef}
           color={hex}
           emissive={hex}
-          emissiveIntensity={button.isActive ? 1.5 : 0.15}
-          opacity={button.isActive ? 1 : 0.45}
+          emissiveIntensity={baseEmissiveIntensity}
+          opacity={baseOpacity}
           transparent
         />
       </mesh>

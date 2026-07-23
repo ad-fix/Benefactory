@@ -85,6 +85,8 @@ interface RolesLevelLocal {
   engineerSwitchX: number;
   engineerSwitchY: number;
   flipCooldownByColor: Map<string, number>;
+  blueCutterFor: string;
+  redCutterFor: string;
 }
 
 interface ConveyorLocal {
@@ -548,13 +550,22 @@ const showPopup = (imageUrl: string, label: string) => {
     const center = Math.floor(MAX_GRID / 2);
     const minX = center - Math.floor(gridWidth / 2);
     const minY = center - Math.floor(gridHeight / 2);
+    // Mirrors the viewingRole logic below (declared later in this component, after this useMemo).
+    const viewingRoleForPickup = isSoloMode
+      ? (Array.from(players.values())[activePlayerIndex]?.role ?? null)
+      : (myRole ?? null);
 
     return (LEVEL_INTERACTABLES[currentLevel] ?? [])
       .filter((item) => !collectedItems?.has(item.id))
       .filter((item) => item.unlockStage === undefined || (rolesLevel?.stage ?? 0) > item.unlockStage)
       .filter((item) => !item.requiresLevelComplete || currentLevelComplete)
+      .filter((item) => {
+        if (item.pickup === "blue") return viewingRoleForPickup === rolesLevel?.blueCutterFor;
+        if (item.pickup === "red") return viewingRoleForPickup === rolesLevel?.redCutterFor;
+        return true;
+      })
       .map((item) => ({ ...item, absX: minX + item.gridX, absY: minY + item.gridY }));
-  }, [currentLevel, collectedItems, rolesLevel?.stage, currentLevelComplete, gridWidth, gridHeight]);
+  }, [currentLevel, collectedItems, rolesLevel?.stage, currentLevelComplete, gridWidth, gridHeight, isSoloMode, players, activePlayerIndex, myRole, rolesLevel?.blueCutterFor, rolesLevel?.redCutterFor]);
   
   // Keyboard controls
   useEffect(() => {
