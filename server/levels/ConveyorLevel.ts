@@ -51,11 +51,11 @@ export class ConveyorLevel extends BaseLevel {
   private removeDeadlineTimeout: ReturnType<typeof setTimeout> | null = null;
 
   onLevelStart(): void {
+    this.state.currentLevel = "conveyor";
     this.rng = new SeededRng(this.state.seed || 1);
     this.assignRolesByColor();
     this.resetState();
     this.generateFactoryLayout(0);
-    this.disableDeadline();
   }
 
   private assignRolesByColor(): void {
