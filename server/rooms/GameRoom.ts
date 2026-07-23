@@ -4,6 +4,7 @@ import { LiveKitService } from "../services/LiveKitService";
 import { BaseLevel } from "../levels/BaseLevel";
 import { RolesLevel } from "../levels/RolesLevel";
 import { Level1 } from "../levels/Level1";
+import { ConveyorLevel } from "../levels/ConveyorLevel";
 import jwt from "jsonwebtoken";
 
 interface MoveMessage {
@@ -75,9 +76,16 @@ export class GameRoom extends Room<GameState> {
     this.state.gridWidth = this.INITIAL_VISIBLE_WIDTH;
     this.state.gridHeight = this.INITIAL_VISIBLE_HEIGHT;
 
-    this.currentLevel = options.testLevel === "level1"
-  ? new Level1(this.state)
-  : new RolesLevel(this.state);
+    if (options.testLevel === "conveyors") {
+  this.state.currentLevel = "conveyors";
+  this.currentLevel = new ConveyorLevel(this.state);
+} else if (options.testLevel === "level1") {
+  this.state.currentLevel = "level1";
+  this.currentLevel = new Level1(this.state);
+} else {
+  this.state.currentLevel = "roles";
+  this.currentLevel = new RolesLevel(this.state);
+}
 
     console.log("Initial state set");
 

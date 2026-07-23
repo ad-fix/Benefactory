@@ -627,8 +627,8 @@ const showPopup = (imageUrl: string, label: string) => {
           );
 
           if (!isBlocked) {
-            playSound("move");
-+           // Track this pending input
+            playSound("conveyors");
+           // Track this pending input
             const seq = ++seqCounterRef.current;
             pendingInputsRef.current.set(seq, { x: newX, y: newY });
             setPredictedPos({ x: newX, y: newY });

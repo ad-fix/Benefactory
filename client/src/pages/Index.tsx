@@ -185,6 +185,8 @@ const initialGameState: GameStateLocal = {
   bombDefused: false,
   bombExploded: false,
   rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map() },
+  conveyorLevel: { stage: 1, conveyors: [], machines: [], itemX: 0, itemY: 0, processedCount: 0, itemState: "RAW_PART", statusMessage: "Waiting for factory layout...", complete: false },
+
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -301,6 +303,7 @@ const Index = () => {
     });
 
     const rl = gameRoom.state.rolesLevel;
+    const cl = gameRoom.state.conveyorLevel;
     const operatorButtons: ButtonLocal[] = [];
     rl?.operatorButtons?.forEach((b) => {
       operatorButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive, relocateAt: b.relocateAt });
@@ -351,6 +354,17 @@ const Index = () => {
           engineerSwitchX: rl?.engineerSwitchX ?? -1,
           engineerSwitchY: rl?.engineerSwitchY ?? -1,
           flipCooldownByColor,
+        },
+        conveyorLevel: {
+          stage: cl?.stage ?? 1,
+          conveyors: cl?.conveyors ?? [],
+          machines: cl?.machines ?? [],
+          itemX: cl?.itemX ?? 0,
+          itemY: cl?.itemY ?? 0,
+          processedCount: cl?.processedCount ?? 0,
+          itemState: cl?.itemState ?? "RAW_PART",
+          statusMessage: cl?.statusMessage ?? "Waiting for factory layout...",
+          complete: cl?.complete ?? false,
         },
       },
     });
@@ -487,7 +501,7 @@ const Index = () => {
               userId: initPayload.userId,
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
-              // testLevel: "level1", // for testing
+              // testLevel: "conveyors", // temporary conveyor testing
               
             });
 
