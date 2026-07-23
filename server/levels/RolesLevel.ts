@@ -93,6 +93,10 @@ export class RolesLevel extends BaseLevel {
       }
     }
 
+    if (n === 3 && rs.blueCutterFor === "") {
+      this.assignCutterRecipient("blueCutterFor");
+    }
+
     if (n >= 3) {
       this.setupSlowTiles();
     }
@@ -471,8 +475,27 @@ export class RolesLevel extends BaseLevel {
     return true;
   }
 
+  private assignCutterRecipient(field: "blueCutterFor" | "redCutterFor"): void {
+    const rs = this.state.rolesLevel;
+    const eligible: Player[] = [];
+    this.state.players.forEach((p) => {
+      if (p.heldWirecutter !== "") return;
+      if (field === "redCutterFor" && p.role === rs.blueCutterFor) return;
+      eligible.push(p);
+    });
+    if (eligible.length === 0) return;
+    const chosen = eligible[Math.floor(Math.random() * eligible.length)];
+    rs[field] = chosen.role;
+    console.log(`[RolesLevel] ${field} assigned to role ${chosen.role}`);
+  }
+
   isLevelComplete(): boolean {
-    return false;
+    const rs = this.state.rolesLevel;
+    const complete = rs.lights >= 4;
+    if (complete && rs.redCutterFor === "") {
+      this.assignCutterRecipient("redCutterFor");
+    }
+    return complete;
   }
 
   onDispose(): void {

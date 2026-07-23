@@ -51,6 +51,8 @@ export class RolesLevelState extends Schema {
   @type("number") engineerSwitchX: number = -1;
   @type("number") engineerSwitchY: number = -1;
   @type({ map: "number" }) flipCooldownByColor = new MapSchema<number>();
+  @type("string") blueCutterFor: string = "";
+  @type("string") redCutterFor: string = "";
 }
 
 export class ConveyorState extends Schema {

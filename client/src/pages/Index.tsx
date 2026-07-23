@@ -92,6 +92,8 @@ interface ServerGameState {
     engineerSwitchX: number;
     engineerSwitchY: number;
     flipCooldownByColor: Map<string, number>;
+    blueCutterFor: string;
+    redCutterFor: string;
   };
   conveyorLevel?: {
     stage: number;
@@ -132,6 +134,8 @@ interface RolesLevelLocal {
   engineerSwitchX: number;
   engineerSwitchY: number;
   flipCooldownByColor: Map<string, number>;
+  blueCutterFor: string;
+  redCutterFor: string;
 }
 
 interface ConveyorLevelLocal {
@@ -183,7 +187,7 @@ const initialGameState: GameStateLocal = {
   currentLevelComplete: false,
   bombDefused: false,
   bombExploded: false,
-  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map() },
+  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map(), blueCutterFor: "", redCutterFor: "" },
   conveyorLevel: { stage: 1, conveyors: [], machines: [], itemX: 0, itemY: 0, processedCount: 0, itemState: "RAW_PART", statusMessage: "Waiting for factory layout...", complete: false },
 
 };
@@ -350,6 +354,8 @@ const Index = () => {
           engineerSwitchX: rl?.engineerSwitchX ?? -1,
           engineerSwitchY: rl?.engineerSwitchY ?? -1,
           flipCooldownByColor,
+          blueCutterFor: rl?.blueCutterFor ?? "",
+          redCutterFor: rl?.redCutterFor ?? "",
         },
         conveyorLevel: {
           stage: cl?.stage ?? 1,
