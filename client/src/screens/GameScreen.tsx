@@ -41,6 +41,7 @@ import {
   getPlayerDisplayLabel,
   getPlayerUiLabelHex,
   PLAYER_HEX,
+  ROLE_VISUAL,
 } from "@/constants/playerColors";
 
 // Types
@@ -906,31 +907,21 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                 </div>
                 <div className="grid min-w-0 gap-1">
                   <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
-                    Color
+                    Role
                   </p>
                   <p
                     className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200"
                     style={{
                       color: Array.from(players.values())[activePlayerIndex]
-                        ? getPlayerUiLabelHex(Array.from(players.values())[activePlayerIndex].color)
-                        : undefined,
-                    }}
-                  >
-                    {Array.from(players.values())[activePlayerIndex]
-                      ? getPlayerDisplayLabel(Array.from(players.values())[activePlayerIndex].color)
-                      : "…"}
-                  </p>
-                </div>
-                {Array.from(players.values())[activePlayerIndex]?.role && (
-                  <div className="grid min-w-0 gap-1">
-                    <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
-                      Role
-                    </p>
-                    <p className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200">
-                      {Array.from(players.values())[activePlayerIndex].role}
-                    </p>
-                  </div>
-                )}
+                        ? ROLE_VISUAL[Array.from(players.values())[activePlayerIndex].role]?.hex
+                          : undefined,
+                        }}
+                        >
+                        {Array.from(players.values())[activePlayerIndex]?.role
+                        ? Array.from(players.values())[activePlayerIndex].role.charAt(0) + Array.from(players.values())[activePlayerIndex].role.slice(1).toLowerCase()
+                        : "…"}
+                      </p>
+                    </div>
               </div>
 
               <div className="relative z-10 flex min-h-10 w-full shrink-0 flex-nowrap items-center justify-between gap-x-2 border-t border-white/10 px-3 py-2">
@@ -1005,21 +996,11 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                 </p>
                 <p
                   className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200"
-                  style={{ color: myColor ? getPlayerUiLabelHex(myColor) : undefined }}
-                >
-                  {localPlayerDisplayName ?? (myColor ? getPlayerDisplayLabel(myColor) : "…")}
-                </p>
-              </div>
-              {myRole && (
-                <div className="grid min-w-0 gap-1">
-                  <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
-                    Role
+                  style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
+                  >
+                  {localPlayerDisplayName ?? (myRole ? myRole.charAt(0) + myRole.slice(1).toLowerCase() : "…")}
                   </p>
-                  <p className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200">
-                    {myRole}
-                  </p>
-                </div>
-              )}
+                  </div>
               <div className="flex w-full shrink-0 justify-end gap-0.5 border-t border-white/10 pt-2">
                 <button
                   type="button"
@@ -1262,6 +1243,8 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                 <Player
                   key={player.sessionId || index}
                   color={COLOR_MAP_LOWER[player.color]}
+                  shape={ROLE_VISUAL[player.role]?.shape}
+                  hexOverride={ROLE_VISUAL[player.role]?.hex}
                   position={pos}
                   rotation={0}
                   isMe={isMe}
@@ -1276,9 +1259,10 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
               if (!operatorPlayer) return null;
               return (
                 <OperatorGhost
-                  color={COLOR_MAP_LOWER[operatorPlayer.color]}
+                  color={ROLE_VISUAL.OPERATOR.colorId}
+                  hexOverride={ROLE_VISUAL.OPERATOR.hex}
                   position={getVisualPos(operatorPlayer.x, operatorPlayer.y, -1.5)}
-                />
+                  />
               );
             })()}
 

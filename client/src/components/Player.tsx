@@ -14,17 +14,24 @@ type PlayerProps = {
     ringGlowBoost?: number;
     /** Timestamp (ms) until which the player is slowed — tints the icon while in the future. */
     slowedUntil?: number;
+    shape?: "square" | "circle" | "triangle";
+    hexOverride?: string;
 };
 
-export function Player({ color = "green", position = [0, 0, 0], rotation = 0, isMe = false, ringGlowBoost = 1, slowedUntil }: PlayerProps) {
+export function Player({ color = "green", position = [0, 0, 0], rotation = 0, isMe = false, ringGlowBoost = 1, slowedUntil, shape, hexOverride }: PlayerProps) {
     const groupRef = useRef<THREE.Group>(null);
     const meshRef = useRef<THREE.Mesh>(null);
     const isFirstFrame = useRef(true);
 
     const paletteHex = useMemo(() => {
+        if (hexOverride) {
+            return { main: hexOverride, glow: hexOverride, rim: hexOverride };
+        }
         const p = getPlayerPalette(toUpperId(color));
         return { main: p.main, glow: p.glow, rim: p.rim };
-    }, [color]);
+    }, [color, hexOverride]);
+
+    const resolvedShape = shape ?? (color === "red" ? "circle" : color === "blue" ? "triangle" : "square");
 
     const colorPalette = useMemo(
         () => ({
@@ -127,9 +134,9 @@ export function Player({ color = "green", position = [0, 0, 0], rotation = 0, is
     });
 
     const geometry = useMemo(() => {
-        if (color === "red") {
+        if (resolvedShape === "circle") {
             return <sphereGeometry args={[0.6, 32, 32]} />;
-        } else if (color === "blue") {
+        } else if (resolvedShape === "triangle") {
             // Tetrahedron rotated so one face is parallel to floor
             const tetraGeo = new THREE.TetrahedronGeometry(0.8, 0);
             tetraGeo.rotateY(Math.PI / 4);
@@ -140,11 +147,11 @@ export function Player({ color = "green", position = [0, 0, 0], rotation = 0, is
                 <primitive object={glassMaterial} attach="material" />
             </RoundedBox>;
         }
-    }, [color, glassMaterial]);
+    }, [resolvedShape, glassMaterial]);
 
     return (
         <group ref={groupRef}>
-            {color === "green" ? (
+            {resolvedShape === "square" ? (
                 geometry
             ) : (
                 <mesh ref={meshRef} renderOrder={1}>

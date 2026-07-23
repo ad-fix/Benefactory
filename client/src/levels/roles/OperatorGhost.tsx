@@ -5,15 +5,16 @@ import { getPlayerPalette, toUpperId, type PlayerColorLower } from "@/constants/
 interface OperatorGhostProps {
   color: PlayerColorLower;
   position: [number, number, number];
+  hexOverride?: string;
 }
 
 // Monitor-only onion-skin echo of the Operator's live position (stage 4).
 // Heavily transparent/desaturated so it reads as a spectral marker, not a real player.
-export const OperatorGhost = ({ color, position }: OperatorGhostProps) => {
+export const OperatorGhost = ({ color, position, hexOverride }: OperatorGhostProps) => {
   const hex = useMemo(() => {
-    const main = new THREE.Color(getPlayerPalette(toUpperId(color)).main);
+    const main = hexOverride ? new THREE.Color(hexOverride) : new THREE.Color(getPlayerPalette(toUpperId(color)).main);
     return `#${main.lerp(new THREE.Color("#8a8f98"), 0.6).getHexString()}`;
-  }, [color]);
+  }, [color, hexOverride]);
 
   return (
     <group position={position}>
