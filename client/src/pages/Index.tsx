@@ -9,7 +9,6 @@ import { usePlatformVoice } from "@/hooks/usePlatformVoice";
 import { useSounds } from "@/hooks/use-sounds";
 import { PlatformVoiceOverlay } from "@/components/game/PlatformVoiceOverlay";
 import { ResultsOverlay } from "@/components/game/ResultsOverlay";
-import { ConveyorLevelProvider } from "@/levels/conveyors/ConveyorLevelView";
 
 /** Build a redirect URL back to the platform with query params */
 function buildReturnUrl(returnUrl: string, params: Record<string, string | number>): string {
@@ -32,6 +31,7 @@ interface PlayerState {
   name: string;
   school: string;
   discordName: string;
+  heldWirecutter: string;
 }
 
 interface ButtonStateServer {
@@ -42,23 +42,6 @@ interface ButtonStateServer {
   behaviorType: string;
   isActive: boolean;
   relocateAt: number;
-}
-
-interface ConveyorStateServer {
-  id: string;
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  owner: string;
-}
-
-interface MachineStateServer {
-  id: string;
-  machineType: string;
-  order: number;
-  x: number;
-  y: number;
 }
 
 interface ServerGameState {
@@ -72,6 +55,10 @@ interface ServerGameState {
   stage: number;
   seed: number;
   currentLevel: string;
+  collectedItems?: Set<string>;
+  currentLevelComplete?: boolean;
+  bombDefused?: boolean;
+  bombExploded?: boolean;
   rolesLevel?: {
     stage: number;
     lights: number;
@@ -88,17 +75,6 @@ interface ServerGameState {
     engineerSwitchX: number;
     engineerSwitchY: number;
     flipCooldownByColor: Map<string, number>;
-  };
-  conveyorLevel?: {
-    stage: number;
-    conveyors: ConveyorStateServer[];
-    machines: MachineStateServer[];
-    itemX: number;
-    itemY: number;
-    processedCount: number;
-    itemState: string;
-    statusMessage: string;
-    complete: boolean;
   };
 }
 
@@ -130,18 +106,6 @@ interface RolesLevelLocal {
   flipCooldownByColor: Map<string, number>;
 }
 
-interface ConveyorLevelLocal {
-  stage: number;
-  conveyors: ConveyorStateServer[];
-  machines: MachineStateServer[];
-  itemX: number;
-  itemY: number;
-  processedCount: number;
-  itemState: string;
-  statusMessage: string;
-  complete: boolean;
-}
-
 // Batched game state — updated atomically via reducer
 interface GameStateLocal {
   gridWidth: number;
@@ -154,8 +118,11 @@ interface GameStateLocal {
   isGameOver: boolean;
   seed: number;
   currentLevel: string;
+  collectedItems: Set<string>;
+  currentLevelComplete: boolean;
+  bombDefused?: boolean;
+  bombExploded?: boolean; 
   rolesLevel: RolesLevelLocal;
-  conveyorLevel: ConveyorLevelLocal;
 }
 
 type GameAction = { type: "SYNC_STATE"; payload: GameStateLocal };
@@ -171,34 +138,11 @@ const initialGameState: GameStateLocal = {
   isGameOver: false,
   seed: 0,
   currentLevel: "roles",
-  rolesLevel: {
-    stage: 1,
-    lights: 0,
-    frozen: false,
-    operatorButtons: [],
-    engineerButtons: [],
-    confirmationX: -1,
-    confirmationY: -1,
-    confirmationVisible: false,
-    confirmationExpiresAt: 0,
-    expiryCount: 0,
-    slowedUntilBySession: new Map(),
-    hiddenEngineerColor: "",
-    engineerSwitchX: -1,
-    engineerSwitchY: -1,
-    flipCooldownByColor: new Map(),
-  },
-  conveyorLevel: {
-    stage: 1,
-    conveyors: [],
-    machines: [],
-    itemX: 0,
-    itemY: 0,
-    processedCount: 0,
-    itemState: "RAW_PART",
-    statusMessage: "Waiting for factory layout...",
-    complete: false,
-  },
+  collectedItems: new Set(),
+  currentLevelComplete: false,
+  bombDefused: false,
+  bombExploded: false,
+  rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map() },
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -289,7 +233,6 @@ const Index = () => {
     if (current > 0) countdownMaxRef.current = Math.max(countdownMaxRef.current, current);
 
     if (current !== prev && current >= 0 && current <= countdownMaxRef.current) {
-      playSound("move");
     }
 
     if (prev > 0 && current === 0) {
@@ -307,7 +250,7 @@ const Index = () => {
 
     const newPlayers = new Map<string, PlayerState>();
     gameRoom.state.players?.forEach((p, id) => {
-      newPlayers.set(id, { x: p.x, y: p.y, color: p.color, role: p.role || "", sessionId: p.sessionId, name: p.name || "", school: p.school || "", discordName: p.discordName || "" });
+      newPlayers.set(id, { x: p.x, y: p.y, color: p.color, role: p.role || "", sessionId: p.sessionId, name: p.name || "", school: p.school || "", discordName: p.discordName || "", heldWirecutter: p.heldWirecutter || "", });
       if (id === gameRoom.sessionId) {
         if (!myColor) setMyColor(p.color);
         setMyRole(p.role);
@@ -315,7 +258,6 @@ const Index = () => {
     });
 
     const rl = gameRoom.state.rolesLevel;
-    const cl = gameRoom.state.conveyorLevel;
     const operatorButtons: ButtonLocal[] = [];
     rl?.operatorButtons?.forEach((b) => {
       operatorButtons.push({ id: b.id, color: b.color, x: b.x, y: b.y, behaviorType: b.behaviorType, isActive: b.isActive, relocateAt: b.relocateAt });
@@ -346,6 +288,10 @@ const Index = () => {
         isGameOver: gameRoom.state.isGameOver || false,
         timeRemaining: gameRoom.state.timeRemaining ?? 30 * 60,
         currentLevel: gameRoom.state.currentLevel || "roles",
+        collectedItems: gameRoom.state.collectedItems ?? new Set(),
+        currentLevelComplete: gameRoom.state.currentLevelComplete ?? false,
+        bombDefused: gameRoom.state.bombDefused ?? false,
+        bombExploded: gameRoom.state.bombExploded ?? false,
         rolesLevel: {
           stage: rl?.stage ?? 1,
           lights: rl?.lights ?? 0,
@@ -362,17 +308,6 @@ const Index = () => {
           engineerSwitchX: rl?.engineerSwitchX ?? -1,
           engineerSwitchY: rl?.engineerSwitchY ?? -1,
           flipCooldownByColor,
-        },
-        conveyorLevel: {
-          stage: cl?.stage ?? 1,
-          conveyors: cl?.conveyors ? Array.from(cl.conveyors) : [],
-          machines: cl?.machines ? Array.from(cl.machines) : [],
-          itemX: cl?.itemX ?? 0,
-          itemY: cl?.itemY ?? 0,
-          processedCount: cl?.processedCount ?? 0,
-          itemState: cl?.itemState ?? "RAW_PART",
-          statusMessage: cl?.statusMessage ?? "Waiting for factory layout...",
-          complete: cl?.complete ?? false,
         },
       },
     });
@@ -509,6 +444,8 @@ const Index = () => {
               userId: initPayload.userId,
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
+              // testLevel: "level1", // for testing
+              
             });
 
         connectedRoomIdRef.current = gameRoom.roomId;
@@ -648,13 +585,6 @@ const Index = () => {
 
   return (
     <div className="relative min-h-dvh w-full bg-canvas text-foreground">
-      <ConveyorLevelProvider
-        conveyorLevel={gameState.conveyorLevel}
-        gridWidth={gameState.gridWidth}
-        gridHeight={gameState.gridHeight}
-        playersConnected={gameState.players.size}
-        roomId={room?.roomId ?? ""}
-      >
       <GameScreen
         room={room}
         players={gameState.players}
@@ -663,6 +593,8 @@ const Index = () => {
         myColor={myColor}
         myRole={myRole}
         currentLevel={gameState.currentLevel}
+        collectedItems={gameState.collectedItems}
+        currentLevelComplete={gameState.currentLevelComplete}
         isSoloMode={initPayload?.soloMode || false}
         stage={gameState.stage}
         timeRemaining={gameState.timeRemaining}
@@ -675,10 +607,8 @@ const Index = () => {
         onBgMusicVolumeChange={initPayload?.bgMusicUrl ? setBgMusicVolume : undefined}
         challengeName={initPayload?.challengeName}
         rolesLevel={gameState.rolesLevel}
-        conveyorLevel={gameState.conveyorLevel}
         onLeave={handleLeave}
       />
-      </ConveyorLevelProvider>
       {/* TODO: revert — temporarily showing overlay in solo mode */}
       <PlatformVoiceOverlay
         participants={voice.participants}
@@ -809,7 +739,10 @@ const Index = () => {
         <ResultsOverlay
           stage={gameState.stage}
           soloMode={initPayload?.soloMode || false}
-          reason="gameover"
+           reason={
+          gameState.bombDefused ? "bomb_defused" :
+          gameState.bombExploded ? "bomb_exploded" :
+          "gameover"}
           returnUrl={returnUrl}
           players={Array.from(gameState.players.values()).map((p) => ({
             name: p.name,

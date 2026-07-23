@@ -3,8 +3,8 @@ import { GameState, Player, PlayerColor, PlayerRole } from "../schema/GameState"
 import { LiveKitService } from "../services/LiveKitService";
 import { BaseLevel } from "../levels/BaseLevel";
 import { RolesLevel } from "../levels/RolesLevel";
+import { Level1 } from "../levels/Level1";
 import jwt from "jsonwebtoken";
-import { ConveyorLevel } from "../levels/ConveyorLevel";
 
 interface MoveMessage {
   direction: "up" | "down" | "left" | "right";
@@ -75,8 +75,9 @@ export class GameRoom extends Room<GameState> {
     this.state.gridWidth = this.INITIAL_VISIBLE_WIDTH;
     this.state.gridHeight = this.INITIAL_VISIBLE_HEIGHT;
 
-    this.state.currentLevel = "conveyors";
-    this.currentLevel = new ConveyorLevel(this.state);
+    this.currentLevel = options.testLevel === "level1"
+  ? new Level1(this.state)
+  : new RolesLevel(this.state);
 
     console.log("Initial state set");
 
@@ -135,6 +136,7 @@ export class GameRoom extends Room<GameState> {
         player.x = newX;
         player.y = newY;
         this.currentLevel.onPlayerMove(player, newX, newY);
+        this.state.currentLevelComplete = this.currentLevel?.isLevelComplete() ?? false;
 
         // Log move for replay
         this.logEvent({ e: "move", p: this.userIds.get(playerKey) || playerKey, d: direction, x: newX, y: newY });
@@ -145,6 +147,40 @@ export class GameRoom extends Room<GameState> {
         client.send("moveAck", { seq: message.seq, x: player.x, y: player.y });
       }
     });
+
+    this.onMessage("pickupItem", (client, message: { itemId: string; wirecutterColor: string }) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      if (player.heldWirecutter) return;                    // already holding one — one slot only
+      if (this.state.collectedItems.has(message.itemId)) return; // someone already got this one
+      this.state.collectedItems.add(message.itemId);
+      player.heldWirecutter = message.wirecutterColor;
+      });
+
+      this.onMessage("cutWire", (client, message: { color: string }) => {
+  const player = this.state.players.get(client.sessionId);
+  if (!player) return;
+  if (!player.heldWirecutter) return;                 // must be holding a wirecutter
+  if (this.state.bombDefused || this.state.bombExploded) return; // bomb already resolved
+
+  const CORRECT_WIRES = ["red", "green", "blue"];
+  player.heldWirecutter = "";                          // consumed on any attempt, right or wrong
+
+  if (!CORRECT_WIRES.includes(message.color)) {
+    this.state.bombExploded = true;
+    this.state.isGameOver = true;
+    return;
+  }
+
+  if (!this.state.cutWires.includes(message.color)) {
+    this.state.cutWires.push(message.color);
+  }
+
+  if (this.state.cutWires.length === CORRECT_WIRES.length) {
+    this.state.bombDefused = true;
+    this.state.isGameOver = true;
+  }
+  });
 
     // Handle ping - just broadcast to all clients, don't store in state
     this.onMessage("ping", (client, message: PingMessage) => {
@@ -188,6 +224,14 @@ export class GameRoom extends Room<GameState> {
         console.log(`[Dev Mode] Manual roles-level stage skip to ${stage}.`);
         this.currentLevel.devSetStage(stage);
       }
+    });
+
+    // Giving wirecutters for testing bomb wire cutting
+    this.onMessage("devGiveWirecutter", (client, message: { color: string }) => {
+      if (!this.isDevMode) return;
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      player.heldWirecutter = message.color;
     });
 
     // Handle dev role switcher
@@ -707,6 +751,7 @@ export class GameRoom extends Room<GameState> {
     }
 
     this.state.isGameOver = true;
+    this.state.bombExploded = true;
 
     console.log("Game ended!");
 

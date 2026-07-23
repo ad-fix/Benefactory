@@ -3,17 +3,26 @@ import type { ErrorInfo, ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrthographicCamera } from "@react-three/drei";
 import * as Client from "colyseus.js";
+import { LevelMesh } from "@/components/game/LevelMesh";
+import { LEVEL_MESHES } from "@/constants/levelMeshes";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 import { Player } from "@/components/Player";
 import { ParticleFloor } from "@/components/ParticleFloor";
-
+import { useAmbientMusic } from "@/hooks/use-ambient-music";
+import { LEVEL_MUSIC, DEFAULT_LEVEL_MUSIC } from "@/constants/levelMusic";
+// adding in ambient music to levels
 import { PulseRipple } from "@/components/game/PulseRipple";
 import { ClickHandler } from "@/components/ClickHandler";
 import { Info, LogOut, Settings, TriangleAlert, Volume2, VolumeX, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSounds } from "@/hooks/use-sounds";
 // Removed: PolarAmbientParticlesCanvas, NoiseBlobFieldCanvas — hidden behind opaque R3F canvas, wasted WebGL contexts
+import { InteractablePopup } from "@/components/game/InteractablePopup";
+// adding interactable objects depending on level and stage
+import { WireSelectionModal, type WireColor } from "@/components/game/WireSelectionModal";
+import { InteractableItem } from "@/components/game/InteractableItem";
+import { LEVEL_INTERACTABLES } from "@/constants/levelInteractables";
 import { HudCornerLs, POLAR_HUD } from "@/components/ui/polar-chrome";
 import { NoiseFieldOverlay, type NoiseFieldHandle } from "@/components/game/NoiseFieldOverlay";
 import { StageAnnouncement } from "@/components/game/StageAnnouncement";
@@ -48,6 +57,7 @@ interface PlayerState {
   name: string;
   school: string;
   discordName: string;
+  heldWirecutter: string;
 }
 
 interface ButtonLocal {
@@ -252,6 +262,8 @@ interface GameScreenProps {
   myColor: PlayerColor | null;
   myRole?: string | null;
   currentLevel?: string;
+  collectedItems?: Set<string>;
+  currentLevelComplete?: boolean;
   isSoloMode: boolean;
   stage: number;
   timeRemaining: number;
@@ -352,6 +364,8 @@ export const GameScreen = ({
   myColor,
   myRole,
   currentLevel = "roles",
+  collectedItems,
+  currentLevelComplete,
   isSoloMode,
   stage,
   timeRemaining,
@@ -368,6 +382,17 @@ export const GameScreen = ({
   onLeave,
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
+  useAmbientMusic(LEVEL_MUSIC[currentLevel] ?? DEFAULT_LEVEL_MUSIC);
+  const [activePopup, setActivePopup] = useState<{ imageUrl: string; label: string; triggerId: number } | null>(null);
+  const [wireModalOpen, setWireModalOpen] = useState(false);
+const popupCounter = useRef(0);
+
+const showPopup = (imageUrl: string, label: string) => {
+  popupCounter.current += 1;
+  setActivePopup({ imageUrl, label, triggerId: popupCounter.current });
+};
+  console.log("currentLevel:", currentLevel, "rolesLevel.stage:", rolesLevel?.stage);
+
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsExiting, setSettingsExiting] = useState(false);
@@ -432,7 +457,6 @@ export const GameScreen = ({
     if (!room) return;
 
     const handlePing = (message: { x: number; y: number; color: PlayerColor }) => {
-      playSound("ping");
       const now = Date.now();
       const newPing: Ping = {
         id: crypto.randomUUID(),
@@ -602,8 +626,7 @@ export const GameScreen = ({
           );
 
           if (!isBlocked) {
-            playSound("move");
-            // Track this pending input
+                        // Track this pending input
             const seq = ++seqCounterRef.current;
             pendingInputsRef.current.set(seq, { x: newX, y: newY });
             setPredictedPos({ x: newX, y: newY });
@@ -633,6 +656,15 @@ export const GameScreen = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [room, myColor, isSoloMode, activePlayerIndex, players, gridWidth, gridHeight, predictedPos, isDevMode, isSpectator, countdown, isGameOver]);
+
+  const myPlayer = isSoloMode
+    ? Array.from(players.values())[activePlayerIndex]
+    : Array.from(players.values()).find(p => p.sessionId === room?.sessionId);
+
+    const handleCutWire = (color: WireColor) => {
+  if (!myPlayer?.heldWirecutter || !room) return;
+  room.send("cutWire", { color });
+};
 
   // Role of the player currently controlling/viewing (solo: active player; multiplayer: own role)
   const viewingRole = isSoloMode
@@ -1087,7 +1119,6 @@ export const GameScreen = ({
           });
         }}
       >
-        <NebulaBackdrop />
 
         <OrthographicCamera
           makeDefault
@@ -1105,8 +1136,45 @@ export const GameScreen = ({
         <ambientLight intensity={0.7} />
         <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
         <pointLight position={[-10, -10, -10]} intensity={0.5} color={getFloorTint("GREEN")} />
-
+        {LEVEL_MESHES[currentLevel] && (
+  <LevelMesh
+    key={currentLevel}
+    url={LEVEL_MESHES[currentLevel].url}
+    position={LEVEL_MESHES[currentLevel].position}
+    scale={LEVEL_MESHES[currentLevel].scale}
+  />
+)} 
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
+        
+           {(LEVEL_INTERACTABLES[currentLevel] ?? [])
+            .filter((item) => !collectedItems?.has(item.id))
+            .filter((item) => item.unlockStage === undefined || (rolesLevel?.stage ?? 0) > item.unlockStage)
+            .filter((item) => !item.requiresLevelComplete || currentLevelComplete)
+            .map((item) => {
+            const MAX_GRID = 26;
+            const center = Math.floor(MAX_GRID / 2);
+            const minX = center - Math.floor(gridWidth / 2);
+            const minY = center - Math.floor(gridHeight / 2);
+            return (
+            <InteractableItem
+              key={item.id}
+              imageUrl={item.imageUrl}
+              position={getVisualPos(minX + item.gridX, minY + item.gridY, 0)}
+              size={item.size}
+              rotation={item.id === "bomb" ? [-Math.PI / 2, 0 , -Math.PI / 2 ] : undefined}
+              onInteract={() => {
+              if (item.id === "bomb") {
+                setWireModalOpen(true);
+                return;
+                }
+                if (item.pickup && room) {
+                room.send("pickupItem", { itemId: item.id, wirecutterColor: item.pickup });
+                }
+                showPopup(item.imageUrl, item.label);
+                }}
+                />
+              );
+            })}
 
             {/* Players */}
             {Array.from(players.values()).map((player, index) => {
@@ -1237,6 +1305,42 @@ export const GameScreen = ({
       <NoiseFieldOverlay ref={noiseFieldRef} resolutionScale={0.8} />
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
+
+      <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
+        <div className="flex size-10 items-center justify-center border border-dashed border-white/20">
+          {myPlayer?.heldWirecutter ? (
+            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-8 object-contain" />
+          ) : null}
+        </div>
+      </div>
+      
+      <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
+        <div className="flex size-10 items-center justify-center border border-dashed border-white/20">
+          {myPlayer?.heldWirecutter ? (
+            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-8 object-contain" />
+          ) : null}
+        </div>
+      </div>
+
+      {wireModalOpen && (
+        <WireSelectionModal
+          hasWirecutter={!!myPlayer?.heldWirecutter}
+          onSelectWire={(color) => {
+            handleCutWire(color);
+            setWireModalOpen(false);
+          }}
+          onClose={() => setWireModalOpen(false)}
+        />
+      )}
+
+         {activePopup && (              
+        <InteractablePopup
+          key={activePopup.triggerId}
+          imageUrl={activePopup.imageUrl}
+          label={activePopup.label}
+          onClose={() => setActivePopup(null)}
+        />
+      )}
 
       {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} room={room} />}
       {currentLevel === "conveyors" && conveyorLevel && <ConveyorLevelView role={myRole ?? ""} />}

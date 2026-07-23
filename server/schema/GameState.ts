@@ -1,4 +1,6 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
+import { SetSchema } from "@colyseus/schema";
+// ...
 
 export type PlayerColor = "RED" | "GREEN" | "BLUE";
 export type PlayerRole = "OPERATOR" | "ENGINEER" | "MONITOR";
@@ -12,6 +14,7 @@ export class Player extends Schema {
   @type("string") name: string = "";
   @type("string") school: string = "";
   @type("string") discordName: string = "";
+  @type("string") heldWirecutter: string = ""; // "" | "red" | "blue" | "green"
 }
 
 export class ButtonState extends Schema {
@@ -50,35 +53,6 @@ export class RolesLevelState extends Schema {
   @type({ map: "number" }) flipCooldownByColor = new MapSchema<number>();
 }
 
-export class ConveyorState extends Schema {
-  @type("string") id: string = "";
-  @type("number") startX: number = 0;
-  @type("number") startY: number = 0;
-  @type("number") endX: number = 0;
-  @type("number") endY: number = 0;
-  @type("string") owner: string = "";
-}
-
-export class MachineState extends Schema {
-  @type("string") id: string = "";
-  @type("string") machineType: string = "";
-  @type("number") order: number = 0;
-  @type("number") x: number = 0;
-  @type("number") y: number = 0;
-}
-
-export class ConveyorLevelState extends Schema {
-  @type("number") stage: number = 1;
-  @type([ConveyorState]) conveyors = new ArraySchema<ConveyorState>();
-  @type([MachineState]) machines = new ArraySchema<MachineState>();
-  @type("number") itemX: number = 0;
-  @type("number") itemY: number = 0;
-  @type("number") processedCount: number = 0;
-  @type("string") itemState: string = "RAW_PART";
-  @type("string") statusMessage: string = "Waiting for factory layout...";
-  @type("boolean") complete: boolean = false;
-}
-
 export class GameState extends Schema {
   @type("number") gridWidth: number = 10;
   @type("number") gridHeight: number = 8;
@@ -101,5 +75,12 @@ export class GameState extends Schema {
 
   @type(RolesLevelState) rolesLevel = new RolesLevelState();
 
-  @type(ConveyorLevelState) conveyorLevel = new ConveyorLevelState();
+  @type({ set: "string" }) collectedItems = new SetSchema<string>();
+
+  @type("boolean") currentLevelComplete: boolean = false;
+
+  @type("boolean") bombDefused: boolean = false;
+  @type("boolean") bombExploded: boolean = false;
+  @type({ array: "string" }) cutWires = new ArraySchema<string>();
+
 }
