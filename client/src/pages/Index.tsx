@@ -276,9 +276,6 @@ const Index = () => {
 
     if (current > 0) countdownMaxRef.current = Math.max(countdownMaxRef.current, current);
 
-    if (current !== prev && current >= 0 && current <= countdownMaxRef.current) {
-      playSound("conveyors");
-    }
 
     if (prev > 0 && current === 0) {
       setShowGo(true);
@@ -501,7 +498,7 @@ const Index = () => {
               userId: initPayload.userId,
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
-              // testLevel: "conveyors", // temporary conveyor testing
+              testLevel: "conveyors", // temporary conveyor testing
               
             });
 
