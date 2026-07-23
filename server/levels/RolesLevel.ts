@@ -472,7 +472,7 @@ export class RolesLevel extends BaseLevel {
   }
 
   isLevelComplete(): boolean {
-    return false;
+    return this.state.rolesLevel.lights >= 4;
   }
 
   onDispose(): void {
