@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface PopupProps {
   imageUrl: string;
@@ -7,10 +7,13 @@ interface PopupProps {
 }
 
 export function InteractablePopup({ imageUrl, label, onClose }: PopupProps) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
-    const timer = setTimeout(onClose, 3000);
+    const timer = setTimeout(() => onCloseRef.current(), 3000);
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, []); // empty array — only runs once, when this popup instance first mounts
 
   return (
     <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-black/80 rounded-lg p-4 flex items-center gap-3 animate-in fade-in">

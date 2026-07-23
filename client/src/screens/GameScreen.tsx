@@ -28,7 +28,6 @@ import { NoiseFieldOverlay, type NoiseFieldHandle } from "@/components/game/Nois
 import { StageAnnouncement } from "@/components/game/StageAnnouncement";
 import { DevStageControls } from "@/components/game/DevStageControls";
 import { GameControls } from "@/components/game/GameControls";
-import { NebulaBackdrop } from "@/components/game/NebulaBackdrop";
 import { RolesLevelView } from "@/levels/roles/RolesLevelView";
 import { ButtonDot } from "@/levels/roles/ButtonDot";
 import { ConfirmationTile } from "@/levels/roles/ConfirmationTile";
@@ -36,6 +35,7 @@ import { SwitchTile } from "@/levels/roles/SwitchTile";
 import { StageLights } from "@/levels/roles/StageLights";
 import { OperatorGhost } from "@/levels/roles/OperatorGhost";
 import { GhostButton } from "@/levels/roles/GhostButton";
+import { ConveyorLevelView, ConveyorLevelProvider } from "@/levels/conveyors/ConveyorLevelView";
 import {
   getFloorTint,
   getPlayerDisplayLabel,
@@ -85,6 +85,35 @@ interface RolesLevelLocal {
   engineerSwitchX: number;
   engineerSwitchY: number;
   flipCooldownByColor: Map<string, number>;
+}
+
+interface ConveyorLocal {
+  id: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  owner: string;
+}
+
+interface MachineLocal {
+  id: string;
+  machineType: string;
+  order: number;
+  x: number;
+  y: number;
+}
+
+interface ConveyorLevelLocal {
+  stage: number;
+  conveyors: ConveyorLocal[];
+  machines: MachineLocal[];
+  itemX: number;
+  itemY: number;
+  processedCount: number;
+  itemState: string;
+  statusMessage: string;
+  complete: boolean;
 }
 
 interface Ping {
@@ -246,6 +275,7 @@ interface GameScreenProps {
   onBgMusicVolumeChange?: (volume: number) => void;
   challengeName?: string;
   rolesLevel?: RolesLevelLocal;
+  conveyorLevel?: ConveyorLevelLocal;
   onLeave?: () => void;
 }
 
@@ -347,6 +377,7 @@ export const GameScreen = ({
   onBgMusicVolumeChange,
   challengeName,
   rolesLevel,
+  conveyorLevel,
   onLeave,
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
@@ -512,6 +543,19 @@ const showPopup = (imageUrl: string, label: string) => {
     }
   }, [activePlayerIndex, isSoloMode, players]);
 
+  const positionedInteractables = useMemo(() => {
+    const MAX_GRID = 26;
+    const center = Math.floor(MAX_GRID / 2);
+    const minX = center - Math.floor(gridWidth / 2);
+    const minY = center - Math.floor(gridHeight / 2);
+
+    return (LEVEL_INTERACTABLES[currentLevel] ?? [])
+      .filter((item) => !collectedItems?.has(item.id))
+      .filter((item) => item.unlockStage === undefined || (rolesLevel?.stage ?? 0) > item.unlockStage)
+      .filter((item) => !item.requiresLevelComplete || currentLevelComplete)
+      .map((item) => ({ ...item, absX: minX + item.gridX, absY: minY + item.gridY }));
+  }, [currentLevel, collectedItems, rolesLevel?.stage, currentLevelComplete, gridWidth, gridHeight]);
+  
   // Keyboard controls
   useEffect(() => {
     if (!room || isSpectator || countdown > 0 || isGameOver) return;
@@ -534,6 +578,27 @@ const showPopup = (imageUrl: string, label: string) => {
           pendingInputsRef.current.clear();
           setPredictedPos({ x: newPlayer.x, y: newPlayer.y });
           setActivePlayerIndex(newIndex);
+        }
+        return;
+      }
+
+      if (e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        const currentPlayer = isSoloMode
+        ? Array.from(players.values())[activePlayerIndex]
+        : Array.from(players.values()).find(p => p.color === myColor);
+        if (!currentPlayer) return;
+
+        const target = positionedInteractables.find(
+        (item) => item.pickup && item.absX === currentPlayer.x && item.absY === currentPlayer.y
+        );
+        if (target && room) {
+        room.send("pickupItem", {
+        itemId: target.id,
+        wirecutterColor: target.pickup,
+        ...(isSoloMode && currentPlayer ? { targetColor: currentPlayer.color } : {}),
+        });
+        showPopup(target.imageUrl, target.label);
         }
         return;
       }
@@ -594,7 +659,7 @@ const showPopup = (imageUrl: string, label: string) => {
           );
 
           if (!isBlocked) {
-                        // Track this pending input
+           // Track this pending input
             const seq = ++seqCounterRef.current;
             pendingInputsRef.current.set(seq, { x: newX, y: newY });
             setPredictedPos({ x: newX, y: newY });
@@ -623,7 +688,7 @@ const showPopup = (imageUrl: string, label: string) => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [room, myColor, isSoloMode, activePlayerIndex, players, gridWidth, gridHeight, predictedPos, isDevMode, isSpectator, countdown, isGameOver]);
+  }, [room, myColor, isSoloMode, activePlayerIndex, players, gridWidth, gridHeight, predictedPos, isDevMode, isSpectator, countdown, isGameOver, positionedInteractables]);
 
   const myPlayer = isSoloMode
     ? Array.from(players.values())[activePlayerIndex]
@@ -1114,35 +1179,24 @@ const showPopup = (imageUrl: string, label: string) => {
 )} 
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
         
-           {(LEVEL_INTERACTABLES[currentLevel] ?? [])
-            .filter((item) => !collectedItems?.has(item.id))
-            .filter((item) => item.unlockStage === undefined || (rolesLevel?.stage ?? 0) > item.unlockStage)
-            .filter((item) => !item.requiresLevelComplete || currentLevelComplete)
-            .map((item) => {
-            const MAX_GRID = 26;
-            const center = Math.floor(MAX_GRID / 2);
-            const minX = center - Math.floor(gridWidth / 2);
-            const minY = center - Math.floor(gridHeight / 2);
-            return (
-            <InteractableItem
-              key={item.id}
-              imageUrl={item.imageUrl}
-              position={getVisualPos(minX + item.gridX, minY + item.gridY, 0)}
-              size={item.size}
-              rotation={item.id === "bomb" ? [-Math.PI / 2, 0 , -Math.PI / 2 ] : undefined}
-              onInteract={() => {
-              if (item.id === "bomb") {
-                setWireModalOpen(true);
-                return;
-                }
-                if (item.pickup && room) {
-                room.send("pickupItem", { itemId: item.id, wirecutterColor: item.pickup });
-                }
-                showPopup(item.imageUrl, item.label);
-                }}
-                />
-              );
-            })}
+           {positionedInteractables.map((item) => (
+          <InteractableItem
+            key={item.id}
+            imageUrl={item.imageUrl}
+            position={getVisualPos(item.absX, item.absY, 0)}
+            size={item.size}
+            rotation={item.id === "bomb" ? [-Math.PI / 2, 0, -Math.PI / 2] : undefined}
+            onInteract={() => {
+          if (item.id === "bomb") {
+          setWireModalOpen(true);
+          return;
+          }
+          if (!item.pickup) {
+          showPopup(item.imageUrl, item.label);
+          } 
+       }}
+      />
+      ))}
 
             {/* Players */}
             {Array.from(players.values()).map((player, index) => {
@@ -1273,14 +1327,6 @@ const showPopup = (imageUrl: string, label: string) => {
       <NoiseFieldOverlay ref={noiseFieldRef} resolutionScale={0.8} />
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
-
-      <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
-        <div className="flex size-10 items-center justify-center border border-dashed border-white/20">
-          {myPlayer?.heldWirecutter ? (
-            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-8 object-contain" />
-          ) : null}
-        </div>
-      </div>
       
       <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
         <div className="flex size-10 items-center justify-center border border-dashed border-white/20">
@@ -1311,6 +1357,17 @@ const showPopup = (imageUrl: string, label: string) => {
       )}
 
       {currentLevel === "roles" && <RolesLevelView role={myRole ?? ""} room={room} />}
+      {currentLevel === "conveyor" && conveyorLevel && (
+        <ConveyorLevelProvider
+          conveyorLevel={conveyorLevel}
+          gridWidth={gridWidth}
+          gridHeight={gridHeight}
+          playersConnected={players.size}
+          roomId={room?.roomId ?? ""}
+          >
+        <ConveyorLevelView role={myRole ?? ""} />
+        </ConveyorLevelProvider>
+        )}
 
       {/* Leave confirmation dialog */}
       {showLeaveConfirm && (
@@ -1328,11 +1385,11 @@ const showPopup = (imageUrl: string, label: string) => {
             <div className="relative z-[1] flex flex-col gap-1.5">
               <p
                 id="leave-dialog-title"
-                className="font-montreal text-sm font-semibold text-white"
+                className="font-sans text-sm font-semibold text-white"
               >
                 Leave game?
               </p>
-              <p className="font-montreal text-xs text-slate-400">
+              <p className="font-sans text-xs text-slate-400">
                 Are you sure you want to leave this game?
               </p>
             </div>

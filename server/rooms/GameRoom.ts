@@ -4,6 +4,7 @@ import { LiveKitService } from "../services/LiveKitService";
 import { BaseLevel } from "../levels/BaseLevel";
 import { RolesLevel } from "../levels/RolesLevel";
 import { Level1 } from "../levels/Level1";
+import { ConveyorLevel } from "../levels/ConveyorLevel";
 import jwt from "jsonwebtoken";
 
 interface MoveMessage {
@@ -75,9 +76,16 @@ export class GameRoom extends Room<GameState> {
     this.state.gridWidth = this.INITIAL_VISIBLE_WIDTH;
     this.state.gridHeight = this.INITIAL_VISIBLE_HEIGHT;
 
-    this.currentLevel = options.testLevel === "level1"
-  ? new Level1(this.state)
-  : new RolesLevel(this.state);
+    if (options.testLevel === "conveyor") {
+  this.state.currentLevel = "conveyor";
+  this.currentLevel = new ConveyorLevel(this.state);
+} else if (options.testLevel === "level1") {
+  this.state.currentLevel = "level1";
+  this.currentLevel = new Level1(this.state);
+} else {
+  this.state.currentLevel = "roles";
+  this.currentLevel = new RolesLevel(this.state);
+}
 
     console.log("Initial state set");
 
@@ -148,14 +156,23 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
-    this.onMessage("pickupItem", (client, message: { itemId: string; wirecutterColor: string }) => {
-      const player = this.state.players.get(client.sessionId);
+    this.onMessage("pickupItem", (client, message: { itemId: string; wirecutterColor: string; targetColor?: "RED" | "GREEN" | "BLUE" }) => {
+      let player: Player | undefined;
+
+      if (this.isSoloMode && message.targetColor) {
+    this.state.players.forEach((p) => {
+      if (p.color === message.targetColor) player = p;
+      });
+    } else {
+      player = this.state.players.get(client.sessionId);
+    }
+
       if (!player) return;
-      if (player.heldWirecutter) return;                    // already holding one — one slot only
-      if (this.state.collectedItems.has(message.itemId)) return; // someone already got this one
+      if (player.heldWirecutter) return;
+      if (this.state.collectedItems.has(message.itemId)) return;
       this.state.collectedItems.add(message.itemId);
       player.heldWirecutter = message.wirecutterColor;
-      });
+    });
 
       this.onMessage("cutWire", (client, message: { color: string }) => {
   const player = this.state.players.get(client.sessionId);
