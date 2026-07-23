@@ -1,5 +1,4 @@
-import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useMemo } from "react";
 import * as THREE from "three";
 
 const COLOR_MAP: Record<string, string> = {
@@ -34,12 +33,9 @@ interface ButtonDotProps {
   // Engineer view only: the matched operator button's current behaviorType.
   // Presence of this prop marks the button as an engineer button.
   matchedBehaviorType?: string;
-  // Engineer view, stage 4 only: timestamp (ms) until which this color's flip
-  // is on cooldown — dims the whole button while in the future.
-  cooldownUntil?: number;
 }
 
-export const ButtonDot = ({ button, position, matchedBehaviorType, cooldownUntil }: ButtonDotProps) => {
+export const ButtonDot = ({ button, position, matchedBehaviorType }: ButtonDotProps) => {
   const hex = COLOR_MAP[button.color] ?? "#ffffff";
   const auraTexture = useMemo(() => makeAuraTexture(hex), [hex]);
 
@@ -48,23 +44,6 @@ export const ButtonDot = ({ button, position, matchedBehaviorType, cooldownUntil
     ? matchedBehaviorType === "TOGGLE"
     : button.isActive;
 
-  const mainMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
-  const auraMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
-
-  const baseEmissiveIntensity = button.isActive ? 1.5 : 0.15;
-  const baseOpacity = button.isActive ? 1 : 0.45;
-
-  useFrame(() => {
-    const isLocked = !!cooldownUntil && Date.now() < cooldownUntil;
-    if (mainMaterialRef.current) {
-      mainMaterialRef.current.emissiveIntensity = isLocked ? baseEmissiveIntensity * 0.2 : baseEmissiveIntensity;
-      mainMaterialRef.current.opacity = isLocked ? baseOpacity * 0.35 : baseOpacity;
-    }
-    if (auraMaterialRef.current) {
-      auraMaterialRef.current.opacity = isLocked ? 0.25 : 1;
-    }
-  });
-
   return (
     <>
       {/* Soft aura — radial gradient plane, additive blending, no hard edge */}
@@ -72,7 +51,6 @@ export const ButtonDot = ({ button, position, matchedBehaviorType, cooldownUntil
         <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[2.4, 2.4]} />
           <meshBasicMaterial
-            ref={auraMaterialRef}
             map={auraTexture}
             transparent
             blending={THREE.AdditiveBlending}
@@ -85,11 +63,10 @@ export const ButtonDot = ({ button, position, matchedBehaviorType, cooldownUntil
       <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.5, 32]} />
         <meshStandardMaterial
-          ref={mainMaterialRef}
           color={hex}
           emissive={hex}
-          emissiveIntensity={baseEmissiveIntensity}
-          opacity={baseOpacity}
+          emissiveIntensity={button.isActive ? 1.5 : 0.15}
+          opacity={button.isActive ? 1 : 0.45}
           transparent
         />
       </mesh>
