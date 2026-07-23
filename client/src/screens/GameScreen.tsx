@@ -457,6 +457,7 @@ const showPopup = (imageUrl: string, label: string) => {
     if (!room) return;
 
     const handlePing = (message: { x: number; y: number; color: PlayerColor }) => {
+      playSound("ping");
       const now = Date.now();
       const newPing: Ping = {
         id: crypto.randomUUID(),
@@ -626,7 +627,8 @@ const showPopup = (imageUrl: string, label: string) => {
           );
 
           if (!isBlocked) {
-                        // Track this pending input
+            playSound("move");
++           // Track this pending input
             const seq = ++seqCounterRef.current;
             pendingInputsRef.current.set(seq, { x: newX, y: newY });
             setPredictedPos({ x: newX, y: newY });
@@ -1119,6 +1121,7 @@ const showPopup = (imageUrl: string, label: string) => {
           });
         }}
       >
+        <NebulaBackdrop />
 
         <OrthographicCamera
           makeDefault

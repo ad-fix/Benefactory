@@ -9,6 +9,7 @@ import { usePlatformVoice } from "@/hooks/usePlatformVoice";
 import { useSounds } from "@/hooks/use-sounds";
 import { PlatformVoiceOverlay } from "@/components/game/PlatformVoiceOverlay";
 import { ResultsOverlay } from "@/components/game/ResultsOverlay";
+import { ConveyorLevelProvider } from "@/levels/conveyors/ConveyorLevelView";
 
 /** Build a redirect URL back to the platform with query params */
 function buildReturnUrl(returnUrl: string, params: Record<string, string | number>): string {
@@ -44,6 +45,23 @@ interface ButtonStateServer {
   relocateAt: number;
 }
 
+interface ConveyorStateServer {
+  id: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  owner: string;
+}
+
+interface MachineStateServer {
+  id: string;
+  machineType: string;
+  order: number;
+  x: number;
+  y: number;
+}
+
 interface ServerGameState {
   players: Map<string, PlayerState>;
   gridWidth: number;
@@ -76,6 +94,17 @@ interface ServerGameState {
     engineerSwitchY: number;
     flipCooldownByColor: Map<string, number>;
   };
+  conveyorLevel?: {
+    stage: number;
+    conveyors: ConveyorStateServer[];
+    machines: MachineStateServer[];
+    itemX: number;
+    itemY: number;
+    processedCount: number;
+    itemState: string;
+    statusMessage: string;
+    complete: boolean;
+  };
 }
 
 interface ButtonLocal {
@@ -106,6 +135,18 @@ interface RolesLevelLocal {
   flipCooldownByColor: Map<string, number>;
 }
 
+interface ConveyorLevelLocal {
+  stage: number;
+  conveyors: ConveyorStateServer[];
+  machines: MachineStateServer[];
+  itemX: number;
+  itemY: number;
+  processedCount: number;
+  itemState: string;
+  statusMessage: string;
+  complete: boolean;
+}
+
 // Batched game state — updated atomically via reducer
 interface GameStateLocal {
   gridWidth: number;
@@ -123,6 +164,7 @@ interface GameStateLocal {
   bombDefused?: boolean;
   bombExploded?: boolean; 
   rolesLevel: RolesLevelLocal;
+  conveyorLevel: ConveyorLevelLocal;
 }
 
 type GameAction = { type: "SYNC_STATE"; payload: GameStateLocal };
@@ -233,6 +275,7 @@ const Index = () => {
     if (current > 0) countdownMaxRef.current = Math.max(countdownMaxRef.current, current);
 
     if (current !== prev && current >= 0 && current <= countdownMaxRef.current) {
+      playSound("conveyors");
     }
 
     if (prev > 0 && current === 0) {
@@ -585,6 +628,13 @@ const Index = () => {
 
   return (
     <div className="relative min-h-dvh w-full bg-canvas text-foreground">
+      <ConveyorLevelProvider
+        conveyorLevel={gameState.conveyorLevel}
+        gridWidth={gameState.gridWidth}
+        gridHeight={gameState.gridHeight}
+        playersConnected={gameState.players.size}
+        roomId={room?.roomId ?? ""}
+      >
       <GameScreen
         room={room}
         players={gameState.players}
@@ -607,8 +657,10 @@ const Index = () => {
         onBgMusicVolumeChange={initPayload?.bgMusicUrl ? setBgMusicVolume : undefined}
         challengeName={initPayload?.challengeName}
         rolesLevel={gameState.rolesLevel}
+        conveyorLevel={gameState.conveyorLevel}
         onLeave={handleLeave}
       />
+      </ConveyorLevelProvider>
       {/* TODO: revert — temporarily showing overlay in solo mode */}
       <PlatformVoiceOverlay
         participants={voice.participants}
