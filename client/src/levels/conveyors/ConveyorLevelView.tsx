@@ -108,9 +108,7 @@ const RoleMark = ({ role }: { role: string }) => {
 export const ConveyorLevelView = ({ role }: ConveyorLevelViewProps) => {
   const factory = useContext(ConveyorLevelContext);
   if (!factory) return null;
-  if (factory.conveyorLevel.conveyors.length === 0) {
-    return <ConveyorWaitingRoom playersConnected={factory.playersConnected} roomId={factory.roomId} />;
-  }
+  if (factory.conveyorLevel.conveyors.length === 0) return null;
   return <ConveyorBoard role={role} {...factory} />;
 };
 

@@ -331,7 +331,7 @@ const Index = () => {
         isGameOver: gameRoom.state.isGameOver || false,
         timeRemaining: gameRoom.state.timeRemaining ?? 30 * 60,
         currentLevel: gameRoom.state.currentLevel || "roles",
-        collectedItems: gameRoom.state.collectedItems ?? new Set(),
+        collectedItems: new Set(gameRoom.state.collectedItems ?? []),
         currentLevelComplete: gameRoom.state.currentLevelComplete ?? false,
         bombDefused: gameRoom.state.bombDefused ?? false,
         bombExploded: gameRoom.state.bombExploded ?? false,
@@ -498,7 +498,7 @@ const Index = () => {
               userId: initPayload.userId,
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
-             testLevel: "conveyor", // temporary conveyor testing
+             //testLevel: "conveyor", // temporary conveyor testing
               
             });
 

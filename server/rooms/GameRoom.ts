@@ -156,14 +156,23 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
-    this.onMessage("pickupItem", (client, message: { itemId: string; wirecutterColor: string }) => {
-      const player = this.state.players.get(client.sessionId);
+    this.onMessage("pickupItem", (client, message: { itemId: string; wirecutterColor: string; targetColor?: "RED" | "GREEN" | "BLUE" }) => {
+      let player: Player | undefined;
+
+      if (this.isSoloMode && message.targetColor) {
+    this.state.players.forEach((p) => {
+      if (p.color === message.targetColor) player = p;
+      });
+    } else {
+      player = this.state.players.get(client.sessionId);
+    }
+
       if (!player) return;
-      if (player.heldWirecutter) return;                    // already holding one — one slot only
-      if (this.state.collectedItems.has(message.itemId)) return; // someone already got this one
+      if (player.heldWirecutter) return;
+      if (this.state.collectedItems.has(message.itemId)) return;
       this.state.collectedItems.add(message.itemId);
       player.heldWirecutter = message.wirecutterColor;
-      });
+    });
 
       this.onMessage("cutWire", (client, message: { color: string }) => {
   const player = this.state.players.get(client.sessionId);

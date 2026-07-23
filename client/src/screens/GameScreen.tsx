@@ -543,6 +543,19 @@ const showPopup = (imageUrl: string, label: string) => {
     }
   }, [activePlayerIndex, isSoloMode, players]);
 
+  const positionedInteractables = useMemo(() => {
+    const MAX_GRID = 26;
+    const center = Math.floor(MAX_GRID / 2);
+    const minX = center - Math.floor(gridWidth / 2);
+    const minY = center - Math.floor(gridHeight / 2);
+
+    return (LEVEL_INTERACTABLES[currentLevel] ?? [])
+      .filter((item) => !collectedItems?.has(item.id))
+      .filter((item) => item.unlockStage === undefined || (rolesLevel?.stage ?? 0) > item.unlockStage)
+      .filter((item) => !item.requiresLevelComplete || currentLevelComplete)
+      .map((item) => ({ ...item, absX: minX + item.gridX, absY: minY + item.gridY }));
+  }, [currentLevel, collectedItems, rolesLevel?.stage, currentLevelComplete, gridWidth, gridHeight]);
+  
   // Keyboard controls
   useEffect(() => {
     if (!room || isSpectator || countdown > 0 || isGameOver) return;
@@ -565,6 +578,27 @@ const showPopup = (imageUrl: string, label: string) => {
           pendingInputsRef.current.clear();
           setPredictedPos({ x: newPlayer.x, y: newPlayer.y });
           setActivePlayerIndex(newIndex);
+        }
+        return;
+      }
+
+      if (e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        const currentPlayer = isSoloMode
+        ? Array.from(players.values())[activePlayerIndex]
+        : Array.from(players.values()).find(p => p.color === myColor);
+        if (!currentPlayer) return;
+
+        const target = positionedInteractables.find(
+        (item) => item.pickup && item.absX === currentPlayer.x && item.absY === currentPlayer.y
+        );
+        if (target && room) {
+        room.send("pickupItem", {
+        itemId: target.id,
+        wirecutterColor: target.pickup,
+        ...(isSoloMode && currentPlayer ? { targetColor: currentPlayer.color } : {}),
+        });
+        showPopup(target.imageUrl, target.label);
         }
         return;
       }
@@ -654,7 +688,7 @@ const showPopup = (imageUrl: string, label: string) => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [room, myColor, isSoloMode, activePlayerIndex, players, gridWidth, gridHeight, predictedPos, isDevMode, isSpectator, countdown, isGameOver]);
+  }, [room, myColor, isSoloMode, activePlayerIndex, players, gridWidth, gridHeight, predictedPos, isDevMode, isSpectator, countdown, isGameOver, positionedInteractables]);
 
   const myPlayer = isSoloMode
     ? Array.from(players.values())[activePlayerIndex]
@@ -1145,35 +1179,24 @@ const showPopup = (imageUrl: string, label: string) => {
 )} 
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
         
-           {(LEVEL_INTERACTABLES[currentLevel] ?? [])
-            .filter((item) => !collectedItems?.has(item.id))
-            .filter((item) => item.unlockStage === undefined || (rolesLevel?.stage ?? 0) > item.unlockStage)
-            .filter((item) => !item.requiresLevelComplete || currentLevelComplete)
-            .map((item) => {
-            const MAX_GRID = 26;
-            const center = Math.floor(MAX_GRID / 2);
-            const minX = center - Math.floor(gridWidth / 2);
-            const minY = center - Math.floor(gridHeight / 2);
-            return (
-            <InteractableItem
-              key={item.id}
-              imageUrl={item.imageUrl}
-              position={getVisualPos(minX + item.gridX, minY + item.gridY, 0)}
-              size={item.size}
-              rotation={item.id === "bomb" ? [-Math.PI / 2, 0 , -Math.PI / 2 ] : undefined}
-              onInteract={() => {
-              if (item.id === "bomb") {
-                setWireModalOpen(true);
-                return;
-                }
-                if (item.pickup && room) {
-                room.send("pickupItem", { itemId: item.id, wirecutterColor: item.pickup });
-                }
-                showPopup(item.imageUrl, item.label);
-                }}
-                />
-              );
-            })}
+           {positionedInteractables.map((item) => (
+          <InteractableItem
+            key={item.id}
+            imageUrl={item.imageUrl}
+            position={getVisualPos(item.absX, item.absY, 0)}
+            size={item.size}
+            rotation={item.id === "bomb" ? [-Math.PI / 2, 0, -Math.PI / 2] : undefined}
+            onInteract={() => {
+          if (item.id === "bomb") {
+          setWireModalOpen(true);
+          return;
+          }
+          if (!item.pickup) {
+          showPopup(item.imageUrl, item.label);
+          } 
+       }}
+      />
+      ))}
 
             {/* Players */}
             {Array.from(players.values()).map((player, index) => {
