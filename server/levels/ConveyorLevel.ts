@@ -200,7 +200,6 @@ export class ConveyorLevel extends BaseLevel {
       if (machine.order >= TOTAL_MACHINE_COUNT) {
         cs.complete = true;
         cs.statusMessage = "Wire cutter complete. Factory run successful.";
-        this.state.isGameOver = true;
         return false;
       }
 

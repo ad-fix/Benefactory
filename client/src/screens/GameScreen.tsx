@@ -35,12 +35,13 @@ import { SwitchTile } from "@/levels/roles/SwitchTile";
 import { StageLights } from "@/levels/roles/StageLights";
 import { OperatorGhost } from "@/levels/roles/OperatorGhost";
 import { GhostButton } from "@/levels/roles/GhostButton";
-import { ConveyorLevelView, ConveyorLevelProvider } from "@/levels/conveyors/ConveyorLevelView";
+import { ConveyorLevelView, ConveyorLevelProvider, ROLE_THEME, RoleMark } from "@/levels/conveyors/ConveyorLevelView";
 import {
   getFloorTint,
   getPlayerDisplayLabel,
   getPlayerUiLabelHex,
   PLAYER_HEX,
+  ROLE_VISUAL,
 } from "@/constants/playerColors";
 
 // Types
@@ -165,7 +166,7 @@ class CanvasErrorBoundary extends Component<
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="rounded-none border border-emerald-500/60 bg-emerald-950/40 px-4 py-2 font-montreal text-xs uppercase tracking-wider text-emerald-200 transition hover:border-emerald-400/80 hover:bg-emerald-900/50"
+              className="rounded-none border border-emerald-500/60 bg-emerald-950/40 px-4 py-2 font-montreal text-sm uppercase tracking-wider text-emerald-200 transition hover:border-emerald-400/80 hover:bg-emerald-900/50"
             >
               Reload
             </button>
@@ -392,7 +393,7 @@ const showPopup = (imageUrl: string, label: string) => {
   popupCounter.current += 1;
   setActivePopup({ imageUrl, label, triggerId: popupCounter.current });
 };
-  console.log("currentLevel:", currentLevel, "rolesLevel.stage:", rolesLevel?.stage);
+  console.log("currentLevel:", currentLevel, "rolesLevel.stage:", rolesLevel?.stage, "currentLevelComplete:", currentLevelComplete);
 
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -545,28 +546,51 @@ const showPopup = (imageUrl: string, label: string) => {
     }
   }, [activePlayerIndex, isSoloMode, players]);
 
-  const positionedInteractables = useMemo(() => {
-    const MAX_GRID = 26;
-    const center = Math.floor(MAX_GRID / 2);
-    const minX = center - Math.floor(gridWidth / 2);
-    const minY = center - Math.floor(gridHeight / 2);
-    // Mirrors the viewingRole logic below (declared later in this component, after this useMemo).
+    const CONVEYOR_SPAWN_TILES: [number, number][] = [
+     [12, 25], // TODO: replace with real coordinates
+     ];
+
+     // Mirrors the viewingRole logic below (declared later in this component, after this useMemo).
     const viewingRoleForPickup = isSoloMode
       ? (Array.from(players.values())[activePlayerIndex]?.role ?? null)
       : (myRole ?? null);
 
-    return (LEVEL_INTERACTABLES[currentLevel] ?? [])
+    const positionedInteractables = useMemo(() => {
+    const MAX_GRID = 26;
+    const center = Math.floor(MAX_GRID / 2);
+    const minX = center - Math.floor(gridWidth / 2);
+    const minY = center - Math.floor(gridHeight / 2);
+
+      return (LEVEL_INTERACTABLES[currentLevel] ?? [])
       .filter((item) => !collectedItems?.has(item.id))
       .filter((item) => item.unlockStage === undefined || (rolesLevel?.stage ?? 0) > item.unlockStage)
       .filter((item) => !item.requiresLevelComplete || currentLevelComplete)
-      .filter((item) => {
-        if (item.pickup === "blue") return viewingRoleForPickup === rolesLevel?.blueCutterFor;
-        if (item.pickup === "red") return viewingRoleForPickup === rolesLevel?.redCutterFor;
-        return true;
-      })
-      .map((item) => ({ ...item, absX: minX + item.gridX, absY: minY + item.gridY }));
-  }, [currentLevel, collectedItems, rolesLevel?.stage, currentLevelComplete, gridWidth, gridHeight, isSoloMode, players, activePlayerIndex, myRole, rolesLevel?.blueCutterFor, rolesLevel?.redCutterFor]);
-  
+      .map((item) => {
+      if (currentLevel === "conveyor" && item.id === "wirecutter-green" && conveyorLevel) {
+        return { ...item, absX: conveyorLevel.itemX, absY: conveyorLevel.itemY };
+      }
+      return { ...item, absX: minX + item.gridX, absY: minY + item.gridY };
+    });
+  }, [currentLevel, collectedItems, rolesLevel?.stage, currentLevelComplete, gridWidth, gridHeight, conveyorLevel]);
+
+  // camera fix for conveyor
+  const [viewportSize, setViewportSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+useEffect(() => {
+  const onResize = () => setViewportSize({ width: window.innerWidth, height: window.innerHeight });
+  window.addEventListener("resize", onResize);
+  return () => window.removeEventListener("resize", onResize);
+}, []);
+
+const worldToScreenPercent = (worldX: number, worldZ: number) => {
+  const zoom = calcBoardZoom(gridWidth, gridHeight, SPACING, viewportSize.height);
+  const screenXPx = viewportSize.width / 2 + worldX * zoom;
+  const screenYPx = viewportSize.height / 2 + worldZ * zoom;
+  return {
+    leftPercent: (screenXPx / viewportSize.width) * 100,
+    topPercent: (screenYPx / viewportSize.height) * 100,
+  };
+};
+
   // Keyboard controls
   useEffect(() => {
     if (!room || isSpectator || countdown > 0 || isGameOver) return;
@@ -710,6 +734,23 @@ const showPopup = (imageUrl: string, label: string) => {
   room.send("cutWire", { color });
 };
 
+  const lastHintTileRef = useRef<string | null>(null);
+    useEffect(() => {
+      if (!myPlayer) return;
+  const checkX = predictedPos && currentLevel !== "conveyor" ? predictedPos.x : myPlayer.x;
+  const checkY = predictedPos && currentLevel !== "conveyor" ? predictedPos.y : myPlayer.y;
+
+  const onItem = positionedInteractables.find(
+    (item) => item.pickup && item.absX === checkX && item.absY === checkY
+  );
+  const tileKey = onItem ? `${checkX},${checkY}` : null;
+
+  if (tileKey && tileKey !== lastHintTileRef.current) {
+    showPopup(onItem!.imageUrl, "Press E to pick up");
+  }
+  lastHintTileRef.current = tileKey;
+}, [myPlayer, predictedPos, currentLevel, positionedInteractables]);
+
   // Role of the player currently controlling/viewing (solo: active player; multiplayer: own role)
   const viewingRole = isSoloMode
     ? (Array.from(players.values())[activePlayerIndex]?.role ?? null)
@@ -750,8 +791,9 @@ const showPopup = (imageUrl: string, label: string) => {
       {/* NOTE: PolarAmbientParticlesCanvas & NoiseBlobFieldCanvas removed —
            hidden behind opaque R3F Canvas (z-[1]), wasted WebGL contexts.
            NoiseFieldOverlay + ScoreBurstOverlay moved AFTER the R3F Canvas below. */}
+
       {/* HUD: frosted polar chrome (match timer / stage chips); settings swap into same shell */}
-      <div className="absolute left-4 top-4 z-20 flex w-[min(11.5rem,calc(100vw-2rem))] flex-col gap-2">
+      <div className="absolute left-4 top-4 z-20 flex w-[min(14rem,calc(100vw-2rem))] flex-col gap-2">
         <div
           className="relative flex flex-col overflow-hidden rounded-none border border-solid bg-canvas/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px]"
           style={{ borderColor: POLAR_HUD.border }}
@@ -783,19 +825,19 @@ const showPopup = (imageUrl: string, label: string) => {
               aria-modal="true"
               aria-labelledby="game-settings-title"
               className={cn(
-                "relative z-20 flex max-h-[min(70vh,22rem)] min-h-0 w-full shrink-0 flex-col gap-3 overflow-y-auto bg-transparent px-3 py-3 transition-opacity duration-300 ease-out",
+                "relative z-20 flex max-h-[min(70vh,22rem)] min-h-0 w-full shrink-0 flex-col gap-3 overflow-y-auto bg-transparent px-5 py-5 transition-opacity duration-300 ease-out",
                 settingsExiting ? "pointer-events-none opacity-0" : "opacity-100",
               )}
             >
               <p
                 id="game-settings-title"
-                className="font-montreal text-[9px] font-medium uppercase tracking-[0.12em] text-slate-500"
+                className="font-montreal text-[16px] font-medium uppercase tracking-[0.12em] text-slate-500"
               >
                 Settings
               </p>
               {bgMusicVolume !== undefined && onBgMusicVolumeChange && (
                 <div className="w-full min-w-0">
-                  <p className="mb-1.5 font-montreal text-[9px] uppercase tracking-[0.12em] text-slate-500">
+                  <p className="mb-1.5 font-montreal text-[16px] uppercase tracking-[0.12em] text-slate-500">
                     Music
                   </p>
                   <div className="flex w-full min-w-0 items-center gap-2">
@@ -823,7 +865,7 @@ const showPopup = (imageUrl: string, label: string) => {
                 </div>
               )}
               <div className="w-full min-w-0">
-                <p className="mb-1.5 font-montreal text-[9px] uppercase tracking-[0.12em] text-slate-500">
+                <p className="mb-1.5 font-montreal text-[16px] uppercase tracking-[0.12em] text-slate-500">
                   SFX
                 </p>
                 <div className="flex w-full min-w-0 items-center gap-2">
@@ -851,7 +893,7 @@ const showPopup = (imageUrl: string, label: string) => {
               </div>
               {room?.roomId && (
                 <div className="border-t border-white/10 pt-3">
-                  <p className="font-montreal text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                  <p className="font-montreal text-[16px] uppercase tracking-[0.12em] text-slate-500">
                     Room code
                   </p>
                   <p className="mt-1 font-mono text-sm font-semibold tracking-widest text-white">
@@ -866,48 +908,38 @@ const showPopup = (imageUrl: string, label: string) => {
             <>
           {isSoloMode ? (
             <>
-              <div className="relative z-10 flex w-full shrink-0 flex-col gap-3 px-3 py-3">
+              <div className="relative z-10 flex w-full shrink-0 flex-col gap-3 px-5 py-5">
                 <div className="grid min-w-0 gap-1">
-                  <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                  <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Mode
                   </p>
-                  <p className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200">
+                  <p className="truncate text-base font-medium tabular-nums leading-tight text-slate-200">
                     Solo mode
                   </p>
                 </div>
                 <div className="grid min-w-0 gap-1">
-                  <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
-                    Color
+                  <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                    Role
                   </p>
                   <p
-                    className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200"
+                    className="truncate text-base font-medium tabular-nums leading-tight text-slate-200"
                     style={{
                       color: Array.from(players.values())[activePlayerIndex]
-                        ? getPlayerUiLabelHex(Array.from(players.values())[activePlayerIndex].color)
-                        : undefined,
-                    }}
-                  >
-                    {Array.from(players.values())[activePlayerIndex]
-                      ? getPlayerDisplayLabel(Array.from(players.values())[activePlayerIndex].color)
-                      : "…"}
-                  </p>
-                </div>
-                {Array.from(players.values())[activePlayerIndex]?.role && (
-                  <div className="grid min-w-0 gap-1">
-                    <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
-                      Role
-                    </p>
-                    <p className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200">
-                      {Array.from(players.values())[activePlayerIndex].role}
-                    </p>
-                  </div>
-                )}
+                        ? ROLE_VISUAL[Array.from(players.values())[activePlayerIndex].role]?.hex
+                          : undefined,
+                        }}
+                        >
+                        {Array.from(players.values())[activePlayerIndex]?.role
+                        ? Array.from(players.values())[activePlayerIndex].role.charAt(0) + Array.from(players.values())[activePlayerIndex].role.slice(1).toLowerCase()
+                        : "…"}
+                      </p>
+                    </div>
               </div>
 
               <div className="relative z-10 flex min-h-10 w-full shrink-0 flex-nowrap items-center justify-between gap-x-2 border-t border-white/10 px-3 py-2">
                 <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
                   <kbd
-                    className="inline-flex shrink-0 items-center rounded-none border border-solid bg-canvas/50 px-1.5 py-0.5 font-montreal text-[9px] font-medium uppercase tracking-[0.1em] text-slate-400"
+                    className="inline-flex shrink-0 items-center rounded-none border border-solid bg-canvas/50 px-1.5 py-0.5 font-montreal text-[16px] font-medium uppercase tracking-[0.1em] text-slate-400"
                     style={{ borderColor: POLAR_HUD.border }}
                   >
                     Tab
@@ -955,42 +987,32 @@ const showPopup = (imageUrl: string, label: string) => {
           ) : (
             <div className="relative z-10 flex w-full shrink-0 flex-col gap-3 px-3 py-3">
               <div className="grid min-w-0 gap-1">
-                <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                   Mode
                 </p>
-                <p className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200">Multiplayer</p>
+                <p className="truncate text-base font-medium tabular-nums leading-tight text-slate-200">Multiplayer</p>
               </div>
               {room?.roomId && (
                 <div className="grid min-w-0 gap-1">
-                  <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                  <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Room code
                   </p>
-                  <p className="truncate font-mono text-xs font-semibold tracking-widest text-white">
+                  <p className="truncate font-mono text-sm font-semibold tracking-widest text-white">
                     {room.roomId}
                   </p>
                 </div>
               )}
               <div className="grid min-w-0 gap-1">
-                <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                   You
                 </p>
                 <p
-                  className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200"
-                  style={{ color: myColor ? getPlayerUiLabelHex(myColor) : undefined }}
-                >
-                  {localPlayerDisplayName ?? (myColor ? getPlayerDisplayLabel(myColor) : "…")}
-                </p>
-              </div>
-              {myRole && (
-                <div className="grid min-w-0 gap-1">
-                  <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
-                    Role
+                  className="truncate text-sm font-medium tabular-nums leading-tight text-slate-200"
+                  style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
+                  >
+                  {localPlayerDisplayName ?? (myRole ? myRole.charAt(0) + myRole.slice(1).toLowerCase() : "…")}
                   </p>
-                  <p className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200">
-                    {myRole}
-                  </p>
-                </div>
-              )}
+                  </div>
               <div className="flex w-full shrink-0 justify-end gap-0.5 border-t border-white/10 pt-2">
                 <button
                   type="button"
@@ -1059,12 +1081,13 @@ const showPopup = (imageUrl: string, label: string) => {
           <HudCornerLs />
           <div className="relative z-[1]">
             {challengeName ? (
-              <p className="mb-1.5 font-montreal text-[8px] uppercase leading-tight tracking-[0.12em] text-slate-500">
+              <p className="mb-1.5 font-montreal text-[20px] uppercase leading-tight tracking-[0.12em] text-slate-500">
                 {challengeName}
               </p>
             ) : null}
-            <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">Stage</p>
-            <p className="font-montreal text-3xl font-bold leading-tight tracking-[-0.02em] text-white">{stage}</p>
+            <p className="font-montreal text-2xl font-bold leading-tight tracking-[0.12em] text-white">
+              Level {stage}
+            </p>
           </div>
         </div>
       </div>
@@ -1106,9 +1129,8 @@ const showPopup = (imageUrl: string, label: string) => {
         >
           <HudCornerLs />
           <div className="relative z-[1]">
-            <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">Time</p>
-            <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">Remaining</p>
-            <p className="mt-1 font-montreal text-3xl font-bold leading-none tracking-[-0.04em] text-white">
+            <p className="font-montreal text-[16px] uppercase leading-tight tracking-[0.12em] text-slate-300">Time Remaining</p>
+            <p className="mt-1 font-montreal text-3xl font-bold leading-none tracking-[0.06em] text-white">
               {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, "0")}
             </p>
           </div>
@@ -1217,9 +1239,15 @@ const showPopup = (imageUrl: string, label: string) => {
               }
               const isMe = isSoloMode ? index === activePlayerIndex : player.color === myColor;
               // Use predicted position for local player in multiplayer
-              const playerX = isMe && predictedPos ? predictedPos.x : player.x;
-              const playerY = isMe && predictedPos ? predictedPos.y : player.y;
-              const pos = getVisualPos(playerX, playerY, -1.5);
+              const playerX = isMe && predictedPos && currentLevel !== "conveyor" ? predictedPos.x : player.x;
+              const playerY = isMe && predictedPos && currentLevel !== "conveyor" ? predictedPos.y : player.y;
+              const isConveyorSpawnTile =
+              currentLevel === "conveyor" &&
+              CONVEYOR_SPAWN_TILES.some(([sx, sy]) => sx === playerX && sy === playerY);
+
+              const pos = currentLevel === "conveyor" && !isConveyorSpawnTile
+              ? getVisualPos(CONVEYOR_SPAWN_TILES[index % CONVEYOR_SPAWN_TILES.length][0], CONVEYOR_SPAWN_TILES[index % CONVEYOR_SPAWN_TILES.length][1], -1.5)
+              : getVisualPos(playerX, playerY, -1.5);
               const slowedUntil = currentLevel === "roles"
                 ? rolesLevel?.slowedUntilBySession?.get(player.sessionId)
                 : undefined;
@@ -1227,6 +1255,8 @@ const showPopup = (imageUrl: string, label: string) => {
                 <Player
                   key={player.sessionId || index}
                   color={COLOR_MAP_LOWER[player.color]}
+                  shape={ROLE_VISUAL[player.role]?.shape}
+                  hexOverride={ROLE_VISUAL[player.role]?.hex}
                   position={pos}
                   rotation={0}
                   isMe={isMe}
@@ -1241,9 +1271,10 @@ const showPopup = (imageUrl: string, label: string) => {
               if (!operatorPlayer) return null;
               return (
                 <OperatorGhost
-                  color={COLOR_MAP_LOWER[operatorPlayer.color]}
+                  color={ROLE_VISUAL.OPERATOR.colorId}
+                  hexOverride={ROLE_VISUAL.OPERATOR.hex}
                   position={getVisualPos(operatorPlayer.x, operatorPlayer.y, -1.5)}
-                />
+                  />
               );
             })()}
 
@@ -1339,10 +1370,11 @@ const showPopup = (imageUrl: string, label: string) => {
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
       
+      {/*inventory*/}
       <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
-        <div className="flex size-10 items-center justify-center border border-dashed border-white/20">
+        <div className="flex size-16 items-center justify-center border border-dashed border-white/20">
           {myPlayer?.heldWirecutter ? (
-            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-8 object-contain" />
+            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-4 object-contain" />
           ) : null}
         </div>
       </div>
@@ -1375,6 +1407,7 @@ const showPopup = (imageUrl: string, label: string) => {
           gridHeight={gridHeight}
           playersConnected={players.size}
           roomId={room?.roomId ?? ""}
+          worldToScreenPercent={worldToScreenPercent}
           >
         <ConveyorLevelView role={myRole ?? ""} />
         </ConveyorLevelProvider>
@@ -1400,7 +1433,7 @@ const showPopup = (imageUrl: string, label: string) => {
               >
                 Leave game?
               </p>
-              <p className="font-sans text-xs text-slate-400">
+              <p className="font-sans text-sm text-slate-400">
                 Are you sure you want to leave this game?
               </p>
             </div>
@@ -1408,14 +1441,14 @@ const showPopup = (imageUrl: string, label: string) => {
               <button
                 type="button"
                 onClick={() => setShowLeaveConfirm(false)}
-                className="flex-1 rounded-none border border-emerald-500/50 bg-emerald-950/50 px-4 py-2 font-montreal text-xs font-medium uppercase tracking-wider text-emerald-300 transition-colors hover:border-emerald-400/70 hover:bg-emerald-900/60"
+                className="flex-1 rounded-none border border-emerald-500/50 bg-emerald-950/50 px-4 py-2 font-montreal text-sm font-medium uppercase tracking-wider text-emerald-300 transition-colors hover:border-emerald-400/70 hover:bg-emerald-900/60"
               >
                 Stay
               </button>
               <button
                 type="button"
                 onClick={onLeave}
-                className="flex-1 rounded-none border border-red-500/50 bg-red-950/50 px-4 py-2 font-montreal text-xs font-medium uppercase tracking-wider text-red-300 transition-colors hover:border-red-400/70 hover:bg-red-900/60"
+                className="flex-1 rounded-none border border-red-500/50 bg-red-950/50 px-4 py-2 font-montreal text-sm font-medium uppercase tracking-wider text-red-300 transition-colors hover:border-red-400/70 hover:bg-red-900/60"
               >
                 Leave
               </button>
