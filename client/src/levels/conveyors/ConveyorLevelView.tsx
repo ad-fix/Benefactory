@@ -78,8 +78,8 @@ const gridToWorld = (x: number, y: number, gridWidth: number, gridHeight: number
 
 export const ROLE_THEME: Record<string, { label: string; color: string; glow: string; shape: "square" | "triangle" | "circle" }> = {
   ENGINEER: { label: "Engineer", color: PALETTE.red, glow: "rgba(239,68,68,0.55)", shape: "square" },
-  MONITOR: { label: "Monitor", color: PALETTE.green, glow: "rgba(34,197,94,0.55)", shape: "triangle" },
-  OPERATOR: { label: "Operator", color: PALETTE.blue, glow: "rgba(59,130,246,0.55)", shape: "circle" },
+  OPERATOR: { label: "Operator", color: PALETTE.green, glow: "rgba(34,197,94,0.55)", shape: "circle" },
+  MONITOR: { label: "Monitor", color: PALETTE.blue, glow: "rgba(59,130,246,0.55)", shape: "triangle" },
 };
 
 const beltContainsPoint = (belt: ConveyorLocal, x: number, y: number) => {

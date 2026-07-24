@@ -79,13 +79,13 @@ export class GameRoom extends Room<GameState> {
     if (options.testLevel === "conveyor") {
   this.state.currentLevel = "conveyor";
   this.currentLevel = new ConveyorLevel(this.state);
-} else if (options.testLevel === "level1") {
-  this.state.currentLevel = "level1";
-  this.currentLevel = new Level1(this.state);
-} else {
+  } else if (options.testLevel === "roles") {
   this.state.currentLevel = "roles";
   this.currentLevel = new RolesLevel(this.state);
-}
+  } else {
+  this.state.currentLevel = "level1";
+  this.currentLevel = new Level1(this.state);
+  }
 
     console.log("Initial state set");
 
