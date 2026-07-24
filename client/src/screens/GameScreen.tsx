@@ -166,7 +166,7 @@ class CanvasErrorBoundary extends Component<
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="rounded-none border border-emerald-500/60 bg-emerald-950/40 px-4 py-2 font-montreal text-xs uppercase tracking-wider text-emerald-200 transition hover:border-emerald-400/80 hover:bg-emerald-900/50"
+              className="rounded-none border border-emerald-500/60 bg-emerald-950/40 px-4 py-2 font-montreal text-sm uppercase tracking-wider text-emerald-200 transition hover:border-emerald-400/80 hover:bg-emerald-900/50"
             >
               Reload
             </button>
@@ -791,8 +791,9 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
       {/* NOTE: PolarAmbientParticlesCanvas & NoiseBlobFieldCanvas removed —
            hidden behind opaque R3F Canvas (z-[1]), wasted WebGL contexts.
            NoiseFieldOverlay + ScoreBurstOverlay moved AFTER the R3F Canvas below. */}
+
       {/* HUD: frosted polar chrome (match timer / stage chips); settings swap into same shell */}
-      <div className="absolute left-4 top-4 z-20 flex w-[min(11.5rem,calc(100vw-2rem))] flex-col gap-2">
+      <div className="absolute left-4 top-4 z-20 flex w-[min(14rem,calc(100vw-2rem))] flex-col gap-2">
         <div
           className="relative flex flex-col overflow-hidden rounded-none border border-solid bg-canvas/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px]"
           style={{ borderColor: POLAR_HUD.border }}
@@ -824,19 +825,19 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
               aria-modal="true"
               aria-labelledby="game-settings-title"
               className={cn(
-                "relative z-20 flex max-h-[min(70vh,22rem)] min-h-0 w-full shrink-0 flex-col gap-3 overflow-y-auto bg-transparent px-3 py-3 transition-opacity duration-300 ease-out",
+                "relative z-20 flex max-h-[min(70vh,22rem)] min-h-0 w-full shrink-0 flex-col gap-3 overflow-y-auto bg-transparent px-5 py-5 transition-opacity duration-300 ease-out",
                 settingsExiting ? "pointer-events-none opacity-0" : "opacity-100",
               )}
             >
               <p
                 id="game-settings-title"
-                className="font-montreal text-[9px] font-medium uppercase tracking-[0.12em] text-slate-500"
+                className="font-montreal text-[12px] font-medium uppercase tracking-[0.12em] text-slate-500"
               >
                 Settings
               </p>
               {bgMusicVolume !== undefined && onBgMusicVolumeChange && (
                 <div className="w-full min-w-0">
-                  <p className="mb-1.5 font-montreal text-[9px] uppercase tracking-[0.12em] text-slate-500">
+                  <p className="mb-1.5 font-montreal text-[12px] uppercase tracking-[0.12em] text-slate-500">
                     Music
                   </p>
                   <div className="flex w-full min-w-0 items-center gap-2">
@@ -864,7 +865,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                 </div>
               )}
               <div className="w-full min-w-0">
-                <p className="mb-1.5 font-montreal text-[9px] uppercase tracking-[0.12em] text-slate-500">
+                <p className="mb-1.5 font-montreal text-[12px] uppercase tracking-[0.12em] text-slate-500">
                   SFX
                 </p>
                 <div className="flex w-full min-w-0 items-center gap-2">
@@ -907,21 +908,21 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
             <>
           {isSoloMode ? (
             <>
-              <div className="relative z-10 flex w-full shrink-0 flex-col gap-3 px-3 py-3">
+              <div className="relative z-10 flex w-full shrink-0 flex-col gap-3 px-5 py-5">
                 <div className="grid min-w-0 gap-1">
-                  <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                  <p className="font-montreal text-[12px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Mode
                   </p>
-                  <p className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200">
+                  <p className="truncate text-base font-medium tabular-nums leading-tight text-slate-200">
                     Solo mode
                   </p>
                 </div>
                 <div className="grid min-w-0 gap-1">
-                  <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                  <p className="font-montreal text-[12px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Role
                   </p>
                   <p
-                    className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200"
+                    className="truncate text-base font-medium tabular-nums leading-tight text-slate-200"
                     style={{
                       color: Array.from(players.values())[activePlayerIndex]
                         ? ROLE_VISUAL[Array.from(players.values())[activePlayerIndex].role]?.hex
@@ -938,7 +939,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
               <div className="relative z-10 flex min-h-10 w-full shrink-0 flex-nowrap items-center justify-between gap-x-2 border-t border-white/10 px-3 py-2">
                 <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
                   <kbd
-                    className="inline-flex shrink-0 items-center rounded-none border border-solid bg-canvas/50 px-1.5 py-0.5 font-montreal text-[9px] font-medium uppercase tracking-[0.1em] text-slate-400"
+                    className="inline-flex shrink-0 items-center rounded-none border border-solid bg-canvas/50 px-1.5 py-0.5 font-montreal text-[12px] font-medium uppercase tracking-[0.1em] text-slate-400"
                     style={{ borderColor: POLAR_HUD.border }}
                   >
                     Tab
@@ -986,27 +987,27 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
           ) : (
             <div className="relative z-10 flex w-full shrink-0 flex-col gap-3 px-3 py-3">
               <div className="grid min-w-0 gap-1">
-                <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                <p className="font-montreal text-[12px] uppercase leading-none tracking-[0.12em] text-slate-500">
                   Mode
                 </p>
-                <p className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200">Multiplayer</p>
+                <p className="truncate text-base font-medium tabular-nums leading-tight text-slate-200">Multiplayer</p>
               </div>
               {room?.roomId && (
                 <div className="grid min-w-0 gap-1">
-                  <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                  <p className="font-montreal text-[12px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Room code
                   </p>
-                  <p className="truncate font-mono text-xs font-semibold tracking-widest text-white">
+                  <p className="truncate font-mono text-sm font-semibold tracking-widest text-white">
                     {room.roomId}
                   </p>
                 </div>
               )}
               <div className="grid min-w-0 gap-1">
-                <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                <p className="font-montreal text-[12px] uppercase leading-none tracking-[0.12em] text-slate-500">
                   You
                 </p>
                 <p
-                  className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200"
+                  className="truncate text-sm font-medium tabular-nums leading-tight text-slate-200"
                   style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
                   >
                   {localPlayerDisplayName ?? (myRole ? myRole.charAt(0) + myRole.slice(1).toLowerCase() : "…")}
@@ -1080,12 +1081,13 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
           <HudCornerLs />
           <div className="relative z-[1]">
             {challengeName ? (
-              <p className="mb-1.5 font-montreal text-[8px] uppercase leading-tight tracking-[0.12em] text-slate-500">
+              <p className="mb-1.5 font-montreal text-[16px] uppercase leading-tight tracking-[0.12em] text-slate-500">
                 {challengeName}
               </p>
             ) : null}
-            <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">Stage</p>
-            <p className="font-montreal text-3xl font-bold leading-tight tracking-[-0.02em] text-white">{stage}</p>
+            <p className="font-montreal text-xl font-bold leading-tight tracking-[-0.02em] text-white">
+              Level {stage}
+            </p>
           </div>
         </div>
       </div>
@@ -1127,8 +1129,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
         >
           <HudCornerLs />
           <div className="relative z-[1]">
-            <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">Time</p>
-            <p className="font-montreal text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-300">Remaining</p>
+            <p className="font-montreal text-[12px] uppercase leading-tight tracking-[0.12em] text-slate-300">Time Remaining</p>
             <p className="mt-1 font-montreal text-3xl font-bold leading-none tracking-[-0.04em] text-white">
               {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, "0")}
             </p>
@@ -1371,9 +1372,9 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
       
       {/*inventory*/}
       <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
-        <div className="flex size-10 items-center justify-center border border-dashed border-white/20">
+        <div className="flex size-16 items-center justify-center border border-dashed border-white/20">
           {myPlayer?.heldWirecutter ? (
-            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-8 object-contain" />
+            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-4 object-contain" />
           ) : null}
         </div>
       </div>
@@ -1432,7 +1433,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
               >
                 Leave game?
               </p>
-              <p className="font-sans text-xs text-slate-400">
+              <p className="font-sans text-sm text-slate-400">
                 Are you sure you want to leave this game?
               </p>
             </div>
@@ -1440,14 +1441,14 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
               <button
                 type="button"
                 onClick={() => setShowLeaveConfirm(false)}
-                className="flex-1 rounded-none border border-emerald-500/50 bg-emerald-950/50 px-4 py-2 font-montreal text-xs font-medium uppercase tracking-wider text-emerald-300 transition-colors hover:border-emerald-400/70 hover:bg-emerald-900/60"
+                className="flex-1 rounded-none border border-emerald-500/50 bg-emerald-950/50 px-4 py-2 font-montreal text-sm font-medium uppercase tracking-wider text-emerald-300 transition-colors hover:border-emerald-400/70 hover:bg-emerald-900/60"
               >
                 Stay
               </button>
               <button
                 type="button"
                 onClick={onLeave}
-                className="flex-1 rounded-none border border-red-500/50 bg-red-950/50 px-4 py-2 font-montreal text-xs font-medium uppercase tracking-wider text-red-300 transition-colors hover:border-red-400/70 hover:bg-red-900/60"
+                className="flex-1 rounded-none border border-red-500/50 bg-red-950/50 px-4 py-2 font-montreal text-sm font-medium uppercase tracking-wider text-red-300 transition-colors hover:border-red-400/70 hover:bg-red-900/60"
               >
                 Leave
               </button>
