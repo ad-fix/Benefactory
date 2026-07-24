@@ -307,16 +307,6 @@ const beltStyle = (belt: ConveyorLocal): CSSProperties => {
           {conveyorLevel.complete ? <Scissors className="size-6" /> : <Package className="size-6" />}
         </div>
       </div>
-
-      {conveyorLevel.complete && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="border-2 border-[#ebe5cf]/60 bg-[#213242] px-12 py-8 text-center shadow-[0_0_60px_rgba(235,229,207,.3)]">
-            <Scissors className="mx-auto size-12" />
-            <p className="mt-4 text-2xl font-black uppercase tracking-[.2em]">Wire cutter complete</p>
-            <p className="mt-2 text-xs text-[#ebe5cf]/65">All nine machines completed in the correct order.</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

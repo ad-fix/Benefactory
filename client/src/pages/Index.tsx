@@ -358,16 +358,16 @@ const Index = () => {
           redCutterFor: rl?.redCutterFor ?? "",
         },
         conveyorLevel: {
-          stage: cl?.stage ?? 1,
-          conveyors: cl?.conveyors ?? [],
-          machines: cl?.machines ?? [],
-          itemX: cl?.itemX ?? 0,
-          itemY: cl?.itemY ?? 0,
-          processedCount: cl?.processedCount ?? 0,
-          itemState: cl?.itemState ?? "RAW_PART",
-          statusMessage: cl?.statusMessage ?? "Waiting for factory layout...",
-          complete: cl?.complete ?? false,
-        },
+  stage: cl?.stage ?? 1,
+  conveyors: cl?.conveyors ? Array.from(cl.conveyors) : [],
+  machines: cl?.machines ? Array.from(cl.machines) : [],
+  itemX: cl?.itemX ?? 0,
+  itemY: cl?.itemY ?? 0,
+  processedCount: cl?.processedCount ?? 0,
+  itemState: cl?.itemState ?? "RAW_PART",
+  statusMessage: cl?.statusMessage ?? "Waiting for factory layout...",
+  complete: cl?.complete ?? false,
+},
       },
     });
   }, [myColor]);
@@ -503,7 +503,7 @@ const Index = () => {
               userId: initPayload.userId,
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
-             //testLevel: "conveyor", // temporary conveyor testing
+              //testLevel: "conveyor", // temporary conveyor testing
               
             });
 

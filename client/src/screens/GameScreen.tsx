@@ -393,7 +393,7 @@ const showPopup = (imageUrl: string, label: string) => {
   popupCounter.current += 1;
   setActivePopup({ imageUrl, label, triggerId: popupCounter.current });
 };
-  console.log("currentLevel:", currentLevel, "rolesLevel.stage:", rolesLevel?.stage);
+  console.log("currentLevel:", currentLevel, "rolesLevel.stage:", rolesLevel?.stage, "currentLevelComplete:", currentLevelComplete);
 
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -547,32 +547,32 @@ const showPopup = (imageUrl: string, label: string) => {
   }, [activePlayerIndex, isSoloMode, players]);
 
     const CONVEYOR_SPAWN_TILES: [number, number][] = [
-     [12, 26], // TODO: replace with real coordinates
-     [13, 26], // TODO: replace with real coordinates
+     [12, 25], // TODO: replace with real coordinates
      ];
+
+     // Mirrors the viewingRole logic below (declared later in this component, after this useMemo).
+    const viewingRoleForPickup = isSoloMode
+      ? (Array.from(players.values())[activePlayerIndex]?.role ?? null)
+      : (myRole ?? null);
 
     const positionedInteractables = useMemo(() => {
     const MAX_GRID = 26;
     const center = Math.floor(MAX_GRID / 2);
     const minX = center - Math.floor(gridWidth / 2);
     const minY = center - Math.floor(gridHeight / 2);
-    // Mirrors the viewingRole logic below (declared later in this component, after this useMemo).
-    const viewingRoleForPickup = isSoloMode
-      ? (Array.from(players.values())[activePlayerIndex]?.role ?? null)
-      : (myRole ?? null);
 
-    return (LEVEL_INTERACTABLES[currentLevel] ?? [])
+      return (LEVEL_INTERACTABLES[currentLevel] ?? [])
       .filter((item) => !collectedItems?.has(item.id))
       .filter((item) => item.unlockStage === undefined || (rolesLevel?.stage ?? 0) > item.unlockStage)
       .filter((item) => !item.requiresLevelComplete || currentLevelComplete)
-      .filter((item) => {
-        if (item.pickup === "blue") return viewingRoleForPickup === rolesLevel?.blueCutterFor;
-        if (item.pickup === "red") return viewingRoleForPickup === rolesLevel?.redCutterFor;
-        return true;
-      })
-      .map((item) => ({ ...item, absX: minX + item.gridX, absY: minY + item.gridY }));
-  }, [currentLevel, collectedItems, rolesLevel?.stage, currentLevelComplete, gridWidth, gridHeight, isSoloMode, players, activePlayerIndex, myRole, rolesLevel?.blueCutterFor, rolesLevel?.redCutterFor]);
-  
+      .map((item) => {
+      if (currentLevel === "conveyor" && item.id === "wirecutter-green" && conveyorLevel) {
+        return { ...item, absX: conveyorLevel.itemX, absY: conveyorLevel.itemY };
+      }
+      return { ...item, absX: minX + item.gridX, absY: minY + item.gridY };
+    });
+  }, [currentLevel, collectedItems, rolesLevel?.stage, currentLevelComplete, gridWidth, gridHeight, conveyorLevel]);
+
   // camera fix for conveyor
   const [viewportSize, setViewportSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 useEffect(() => {

@@ -20,6 +20,6 @@ export const LEVEL_INTERACTABLES: Record<string, InteractableConfig[]> = {
     { id: "wirecutter-red", imageUrl: "/images/wirecutters-red.png", label: "A red wirecutter. It's rusty - probably good for only one use.", gridX: 5, gridY: 1, size: 2.5, pickup: "red", requiresLevelComplete: true },
   ],
   conveyor: [
-     { id: "wirecutter-green", imageUrl: "/images/wirecutters-green.png", label: "A green wirecutter. It's rusty - probably good for only one use.", gridX: 4, gridY: 1, size: 2.5, pickup: "green", requiresLevelComplete: true },
+     { id: "wirecutter-green", imageUrl: "/images/wirecutters-green.png", label: "A green wirecutter. It's rusty - probably good for only one use.", gridX: 12, gridY: 25, size: 2.5, pickup: "green", requiresLevelComplete: true },
    ],
 };
