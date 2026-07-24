@@ -40,6 +40,7 @@ interface ConveyorLevelContextValue {
   gridHeight: number;
   playersConnected: number;
   roomId: string;
+  worldToScreenPercent: (worldX: number, worldZ: number) => { leftPercent: number; topPercent: number };
 }
 
 const ConveyorLevelContext = createContext<ConveyorLevelContextValue | null>(null);
@@ -60,10 +61,25 @@ const PALETTE = {
   blue: "#3b82f6",
 };
 
-const ROLE_THEME: Record<string, { label: string; color: string; glow: string; shape: "square" | "triangle" | "circle" }> = {
+const SPACING = 2.5;
+
+const gridToWorld = (x: number, y: number, gridWidth: number, gridHeight: number) => {
+  const MAX_GRID = 26;
+  const center = Math.floor(MAX_GRID / 2);
+  const minX = center - Math.floor(gridWidth / 2);
+  const minY = center - Math.floor(gridHeight / 2);
+  const offsetX = (gridWidth - 1) / 2;
+  const offsetY = (gridHeight - 1) / 2;
+  return {
+    worldX: (x - minX - offsetX) * SPACING,
+    worldZ: (y - minY - offsetY) * SPACING,
+  };
+};
+
+export const ROLE_THEME: Record<string, { label: string; color: string; glow: string; shape: "square" | "triangle" | "circle" }> = {
   ENGINEER: { label: "Engineer", color: PALETTE.red, glow: "rgba(239,68,68,0.55)", shape: "square" },
-  MONITOR: { label: "Monitor", color: PALETTE.green, glow: "rgba(34,197,94,0.55)", shape: "triangle" },
-  OPERATOR: { label: "Operator", color: PALETTE.blue, glow: "rgba(59,130,246,0.55)", shape: "circle" },
+  OPERATOR: { label: "Operator", color: PALETTE.green, glow: "rgba(34,197,94,0.55)", shape: "circle" },
+  MONITOR: { label: "Monitor", color: PALETTE.blue, glow: "rgba(59,130,246,0.55)", shape: "triangle" },
 };
 
 const beltContainsPoint = (belt: ConveyorLocal, x: number, y: number) => {
@@ -77,7 +93,7 @@ const conveyorSurface = (horizontal: boolean, color: string) => horizontal
   ? `linear-gradient(to bottom, ${color} 0 7%, rgba(0,0,0,.58) 7% 12%, transparent 12% 88%, rgba(0,0,0,.58) 88% 93%, ${color} 93%), repeating-linear-gradient(90deg, rgba(235,229,207,.13) 0 2px, rgba(235,229,207,.025) 2px 8px, rgba(0,0,0,.2) 8px 15px), linear-gradient(#555b58,#202421)`
   : `linear-gradient(to right, ${color} 0 7%, rgba(0,0,0,.58) 7% 12%, transparent 12% 88%, rgba(0,0,0,.58) 88% 93%, ${color} 93%), repeating-linear-gradient(0deg, rgba(235,229,207,.13) 0 2px, rgba(235,229,207,.025) 2px 8px, rgba(0,0,0,.2) 8px 15px), linear-gradient(90deg,#555b58,#202421)`;
 
-const RoleMark = ({ role }: { role: string }) => {
+export const RoleMark = ({ role }: { role: string }) => {
   const theme = ROLE_THEME[role] ?? ROLE_THEME.OPERATOR;
   if (theme.shape === "triangle") {
     return (
@@ -168,29 +184,55 @@ const ConveyorBoard = ({
   conveyorLevel,
   gridWidth,
   gridHeight,
+  worldToScreenPercent,
 }: ConveyorLevelViewProps & ConveyorLevelContextValue) => {
-  const minX = 13 - Math.floor(gridWidth / 2);
-  const minY = 13 - Math.floor(gridHeight / 2);
   const activeTheme = ROLE_THEME[role] ?? ROLE_THEME.OPERATOR;
 
-  const position = (x: number, y: number): CSSProperties => ({
-    left: `${((x - minX + 0.5) / gridWidth) * 100}%`,
-    top: `${((y - minY + 0.5) / gridHeight) * 100}%`,
-  });
-
-  const beltStyle = (belt: ConveyorLocal): CSSProperties => {
-    const horizontal = belt.startY === belt.endY;
-    const localX = Math.min(belt.startX, belt.endX) - minX;
-    const localY = Math.min(belt.startY, belt.endY) - minY;
-    const length = Math.abs(belt.endX - belt.startX) + Math.abs(belt.endY - belt.startY) + 1;
-    const thickness = 0.62;
-    return {
-      left: `${((horizontal ? localX : localX + (1 - thickness) / 2) / gridWidth) * 100}%`,
-      top: `${((horizontal ? localY + (1 - thickness) / 2 : localY) / gridHeight) * 100}%`,
-      width: `${((horizontal ? length : thickness) / gridWidth) * 100}%`,
-      height: `${((horizontal ? thickness : length) / gridHeight) * 100}%`,
-    };
+  const position = (x: number, y: number): CSSProperties => {
+    const { worldX, worldZ } = gridToWorld(x, y, gridWidth, gridHeight);
+    const { leftPercent, topPercent } = worldToScreenPercent(worldX, worldZ);
+    return { left: `${leftPercent}%`, top: `${topPercent}%` };
   };
+
+  const beltWorldBounds = (belt: ConveyorLocal) => {
+    const horizontal = belt.startY === belt.endY;
+    const minGX = Math.min(belt.startX, belt.endX);
+    const maxGX = Math.max(belt.startX, belt.endX);
+    const minGY = Math.min(belt.startY, belt.endY);
+    const maxGY = Math.max(belt.startY, belt.endY);
+    const thicknessCells = 0.62;
+
+    const centerMin = gridToWorld(minGX, minGY, gridWidth, gridHeight);
+    const centerMax = gridToWorld(maxGX, maxGY, gridWidth, gridHeight);
+    const halfCell = SPACING / 2;
+    const halfThickness = (thicknessCells * SPACING) / 2;
+
+    return horizontal
+      ? {
+          worldMinX: centerMin.worldX - halfCell,
+          worldMaxX: centerMax.worldX + halfCell,
+          worldMinZ: centerMin.worldZ - halfThickness,
+          worldMaxZ: centerMin.worldZ + halfThickness,
+        }
+      : {
+          worldMinX: centerMin.worldX - halfThickness,
+          worldMaxX: centerMin.worldX + halfThickness,
+          worldMinZ: centerMin.worldZ - halfCell,
+          worldMaxZ: centerMax.worldZ + halfCell,
+        };
+  };
+
+const beltStyle = (belt: ConveyorLocal): CSSProperties => {
+  const { worldMinX, worldMaxX, worldMinZ, worldMaxZ } = beltWorldBounds(belt);
+  const topLeft = worldToScreenPercent(worldMinX, worldMinZ);
+  const bottomRight = worldToScreenPercent(worldMaxX, worldMaxZ);
+  return {
+    left: `${topLeft.leftPercent}%`,
+    top: `${topLeft.topPercent}%`,
+    width: `${bottomRight.leftPercent - topLeft.leftPercent}%`,
+    height: `${bottomRight.topPercent - topLeft.topPercent}%`,
+  };
+};
 
   const beltsAtItem = useMemo(
     () => new Set(conveyorLevel.conveyors.filter((belt) => beltContainsPoint(belt, conveyorLevel.itemX, conveyorLevel.itemY)).map((belt) => belt.id)),
@@ -204,8 +246,8 @@ const ConveyorBoard = ({
 
   return (
     <div className="pointer-events-none absolute inset-0 z-[30] font-sans text-[#ebe5cf]">
-      <div
-          className="absolute inset-x-[8%] bottom-[8%] top-[17%]">      
+      <div 
+          className="absolute inset-0">      
         <div
           className="absolute inset-0 opacity-1"
           style={{
@@ -265,35 +307,6 @@ const ConveyorBoard = ({
           {conveyorLevel.complete ? <Scissors className="size-6" /> : <Package className="size-6" />}
         </div>
       </div>
-
-      <section className="absolute right-[9%] top-4 flex max-w-[44vw] items-center gap-2 border border-[#ebe5cf]/20 bg-[#213242]/95 px-3 py-2 shadow-xl lg:gap-4 lg:px-4">
-        <Factory className="size-5 text-[#ebe5cf]" />
-        <div>
-          <p className="hidden text-[9px] uppercase tracking-[.22em] text-[#ebe5cf]/50 lg:block">Benefactory production floor</p>
-          <p className="text-sm font-black uppercase tracking-[.12em]">Phase {conveyorLevel.stage} / 3</p>
-        </div>
-        <div className="h-8 w-px bg-[#ebe5cf]/15" />
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider" style={{ color: activeTheme.color }}>
-          <RoleMark role={role} /> {activeTheme.label}
-        </div>
-      </section>
-
-      <div className="absolute bottom-[2.5%] left-1/2 flex -translate-x-1/2 items-center gap-4 border border-[#ebe5cf]/15 bg-black/75 px-4 py-1.5 text-[9px] uppercase tracking-wider text-[#ebe5cf]/65">
-        <span>WASD / arrows run your belts</span>
-        {Object.entries(ROLE_THEME).map(([key, theme]) => (
-          <span key={key} className="flex items-center gap-1.5" style={{ color: theme.color }}><RoleMark role={key} /> {theme.label}</span>
-        ))}
-      </div>
-
-      {conveyorLevel.complete && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="border-2 border-[#ebe5cf]/60 bg-[#213242] px-12 py-8 text-center shadow-[0_0_60px_rgba(235,229,207,.3)]">
-            <Scissors className="mx-auto size-12" />
-            <p className="mt-4 text-2xl font-black uppercase tracking-[.2em]">Wire cutter complete</p>
-            <p className="mt-2 text-xs text-[#ebe5cf]/65">All nine machines completed in the correct order.</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -181,6 +181,19 @@ export const PLAYER_COLOR_LABEL: Record<PlayerColorId, string> = {
   BLUE: PLAYER_COLORS.BLUE.label,
 };
 
+// ── Role-based visuals (Engineer/Operator/Monitor) ──────────────────────────
+// Separate from PLAYER_COLORS above — those are Player-1/2/3 identity slots
+// (intentionally reskinned to orange/white/blue). These are the literal
+// red/green/blue shape+color pairing shown consistently for each role,
+// across every level.
+export type PlayerRoleId = "ENGINEER" | "OPERATOR" | "MONITOR";
+
+export const ROLE_VISUAL: Record<PlayerRoleId, { colorId: "red" | "green" | "blue"; shape: "square" | "circle" | "triangle"; hex: string }> = {
+  ENGINEER: { colorId: "red", shape: "square", hex: "#ef4444" },
+  OPERATOR: { colorId: "green", shape: "circle", hex: "#22c55e" },
+  MONITOR: { colorId: "blue", shape: "triangle", hex: "#3b82f6" },
+};
+
 /** UI copy for a server player id (`GREEN` → theme label, e.g. "Monochrome"). */
 export function getPlayerDisplayLabel(color: string): string {
   if (color === "RED" || color === "GREEN" || color === "BLUE") {

@@ -103,7 +103,7 @@ export class GameState extends Schema {
 
   @type("number") seed: number = 0;
 
-  @type("string") currentLevel: string = "roles";
+  @type("string") currentLevel: string = "level1";
 
   @type(RolesLevelState) rolesLevel = new RolesLevelState();
 
