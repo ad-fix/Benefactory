@@ -504,7 +504,7 @@ const Index = () => {
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
               // testLevel: "conveyor", // temporary conveyor testing
-              // testLevel: "roles", // temporary roles testing
+              testLevel: "roles", // temporary roles testing
               
             });
 
