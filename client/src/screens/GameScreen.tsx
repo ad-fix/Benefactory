@@ -831,13 +831,13 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
             >
               <p
                 id="game-settings-title"
-                className="font-montreal text-[12px] font-medium uppercase tracking-[0.12em] text-slate-500"
+                className="font-montreal text-[16px] font-medium uppercase tracking-[0.12em] text-slate-500"
               >
                 Settings
               </p>
               {bgMusicVolume !== undefined && onBgMusicVolumeChange && (
                 <div className="w-full min-w-0">
-                  <p className="mb-1.5 font-montreal text-[12px] uppercase tracking-[0.12em] text-slate-500">
+                  <p className="mb-1.5 font-montreal text-[16px] uppercase tracking-[0.12em] text-slate-500">
                     Music
                   </p>
                   <div className="flex w-full min-w-0 items-center gap-2">
@@ -865,7 +865,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                 </div>
               )}
               <div className="w-full min-w-0">
-                <p className="mb-1.5 font-montreal text-[12px] uppercase tracking-[0.12em] text-slate-500">
+                <p className="mb-1.5 font-montreal text-[16px] uppercase tracking-[0.12em] text-slate-500">
                   SFX
                 </p>
                 <div className="flex w-full min-w-0 items-center gap-2">
@@ -893,7 +893,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
               </div>
               {room?.roomId && (
                 <div className="border-t border-white/10 pt-3">
-                  <p className="font-montreal text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                  <p className="font-montreal text-[16px] uppercase tracking-[0.12em] text-slate-500">
                     Room code
                   </p>
                   <p className="mt-1 font-mono text-sm font-semibold tracking-widest text-white">
@@ -910,7 +910,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
             <>
               <div className="relative z-10 flex w-full shrink-0 flex-col gap-3 px-5 py-5">
                 <div className="grid min-w-0 gap-1">
-                  <p className="font-montreal text-[12px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                  <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Mode
                   </p>
                   <p className="truncate text-base font-medium tabular-nums leading-tight text-slate-200">
@@ -918,7 +918,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                   </p>
                 </div>
                 <div className="grid min-w-0 gap-1">
-                  <p className="font-montreal text-[12px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                  <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Role
                   </p>
                   <p
@@ -939,7 +939,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
               <div className="relative z-10 flex min-h-10 w-full shrink-0 flex-nowrap items-center justify-between gap-x-2 border-t border-white/10 px-3 py-2">
                 <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
                   <kbd
-                    className="inline-flex shrink-0 items-center rounded-none border border-solid bg-canvas/50 px-1.5 py-0.5 font-montreal text-[12px] font-medium uppercase tracking-[0.1em] text-slate-400"
+                    className="inline-flex shrink-0 items-center rounded-none border border-solid bg-canvas/50 px-1.5 py-0.5 font-montreal text-[16px] font-medium uppercase tracking-[0.1em] text-slate-400"
                     style={{ borderColor: POLAR_HUD.border }}
                   >
                     Tab
@@ -987,14 +987,14 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
           ) : (
             <div className="relative z-10 flex w-full shrink-0 flex-col gap-3 px-3 py-3">
               <div className="grid min-w-0 gap-1">
-                <p className="font-montreal text-[12px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                   Mode
                 </p>
                 <p className="truncate text-base font-medium tabular-nums leading-tight text-slate-200">Multiplayer</p>
               </div>
               {room?.roomId && (
                 <div className="grid min-w-0 gap-1">
-                  <p className="font-montreal text-[12px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                  <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Room code
                   </p>
                   <p className="truncate font-mono text-sm font-semibold tracking-widest text-white">
@@ -1003,7 +1003,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                 </div>
               )}
               <div className="grid min-w-0 gap-1">
-                <p className="font-montreal text-[12px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                   You
                 </p>
                 <p
@@ -1081,11 +1081,11 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
           <HudCornerLs />
           <div className="relative z-[1]">
             {challengeName ? (
-              <p className="mb-1.5 font-montreal text-[16px] uppercase leading-tight tracking-[0.12em] text-slate-500">
+              <p className="mb-1.5 font-montreal text-[20px] uppercase leading-tight tracking-[0.12em] text-slate-500">
                 {challengeName}
               </p>
             ) : null}
-            <p className="font-montreal text-xl font-bold leading-tight tracking-[-0.02em] text-white">
+            <p className="font-montreal text-2xl font-bold leading-tight tracking-[0.12em] text-white">
               Level {stage}
             </p>
           </div>
@@ -1129,8 +1129,8 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
         >
           <HudCornerLs />
           <div className="relative z-[1]">
-            <p className="font-montreal text-[12px] uppercase leading-tight tracking-[0.12em] text-slate-300">Time Remaining</p>
-            <p className="mt-1 font-montreal text-3xl font-bold leading-none tracking-[-0.04em] text-white">
+            <p className="font-montreal text-[16px] uppercase leading-tight tracking-[0.12em] text-slate-300">Time Remaining</p>
+            <p className="mt-1 font-montreal text-3xl font-bold leading-none tracking-[0.06em] text-white">
               {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, "0")}
             </p>
           </div>
