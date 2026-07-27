@@ -80,7 +80,7 @@ export class GameRoom extends Room<GameState> {
     if (this.state.currentLevel === "wires") {
       this.state.gridWidth = 7;
       this.state.gridHeight = 6;
-      this.state.timeRemaining = 5 * 60; // Added by KB 7.22 - 5 minutes for wires level
+      this.state.timeRemaining = 3 * 60; // Updated by KB 7.27 - 3 minutes for wires level
       this.currentLevel = new WiresLevel(this.state);
     } else {
       this.currentLevel = new RolesLevel(this.state);
@@ -215,6 +215,18 @@ export class GameRoom extends Room<GameState> {
     this.onMessage("resetWiresLevel", (client) => {
       if (this.currentLevel instanceof WiresLevel) {
         this.currentLevel.resetLevel();
+      }
+    });
+
+    this.onMessage("dragProgress", (client, message: { color: string; points: { x: number; y: number }[] }) => {
+      if (this.currentLevel instanceof WiresLevel) {
+        this.currentLevel.updateActiveDrag(client.sessionId, message.color, message.points);
+      }
+    });
+
+    this.onMessage("dragEnd", (client) => {
+      if (this.currentLevel instanceof WiresLevel) {
+        this.currentLevel.clearActiveDrag(client.sessionId);
       }
     });
 
@@ -636,7 +648,7 @@ export class GameRoom extends Room<GameState> {
           clearInterval(this.countdownTimer);
           this.countdownTimer = null;
         }
-        this.state.timeRemaining = this.state.currentLevel === "wires" ? 5 * 60 : this.GAME_DURATION;
+        this.state.timeRemaining = this.state.currentLevel === "wires" ? 3 * 60 : this.GAME_DURATION;
         this.gameStartTime = Date.now();
         this.startGameTimer();
         console.log("Countdown complete — game timer started!");
@@ -715,34 +727,33 @@ export class GameRoom extends Room<GameState> {
   }
 
   private startGameTimer() {
-    this.gameTimer = setInterval(() => {
-      if (this.isDevMode) {
-        this.state.timeRemaining--;
-      } else if (this.state.timeRemaining > 0) {
-        this.state.timeRemaining--;
-      }
-
-      if (this.state.timeRemaining <= 0 && !this.state.isGameOver && !this.isDevMode) {
-        this.endGame();
-      }
-    }, 1000);
-  }
-
-  private async endGame() {
-    if (this.gameTimer) {
-      clearInterval(this.gameTimer);
-      this.gameTimer = null;
+  this.gameTimer = setInterval(() => {
+    if (this.state.timeRemaining > 0) {
+      this.state.timeRemaining--;
     }
 
-    this.state.isGameOver = true;
+    if (this.state.timeRemaining <= 0 && !this.state.isGameOver) {
+      this.endGame();
+    }
+  }, 1000);
+}
 
-    console.log("Game ended!");
-
-    await this.endPolarWindsSession();
-
-    // Dispose the room after game ends
-    this.disconnect();
+private async endGame() {
+  if (this.gameTimer) {
+    clearInterval(this.gameTimer);
+    this.gameTimer = null;
   }
+
+  this.state.isGameOver = true;
+
+  console.log("Game ended!");
+
+  await this.endPolarWindsSession();
+
+  setTimeout(() => {
+    this.disconnect();
+  }, 3000);
+}
 
   private logEvent(event: Record<string, unknown>) {
     event.t = Date.now() - this.gameStartTime;

@@ -63,7 +63,14 @@ export function WiresFloor({ room, gridWidth, gridHeight, spacing, endpoints }: 
           if (dx === 0 && dz === 0) return prev;
           const isOrthogonal = (dx === 1 && dz === 0) || (dx === 0 && dz === 1);
           if (!isOrthogonal) return prev;
-          return [...prev, { x: gridX, y: gridZ }];
+
+          const newPath = [...prev, { x: gridX, y: gridZ }];
+
+          const absPoints = newPath.map((p) => toAbsolute(p.x, p.y));
+          room?.send("dragProgress", { color: pathColor, points: absPoints });
+
+          return newPath;
+
         });
       }}
       onPointerUp={() => {
@@ -71,6 +78,7 @@ export function WiresFloor({ room, gridWidth, gridHeight, spacing, endpoints }: 
           const absPoints = pathPoints.map((p) => toAbsolute(p.x, p.y));
           room?.send("drawWire", { color: pathColor, points: absPoints });
         }
+        room?.send("dragEnd", {});
         setIsDragging(false);
         setPathPoints([]);
       }}

@@ -85,6 +85,7 @@ interface WiresLevelLocal {
   completedWires: { color: string; points: { x: number; y: number }[] }[];
   usedEndpointIds: string[];
   solved: boolean;
+  activeDrags: { sessionId: string; color: string; points: { x: number; y: number }[] }[];
 }
 
 interface Ping {
@@ -346,7 +347,7 @@ export const GameScreen = ({
   rolesLevel,
   wiresLevel, //added by KB 7.20.26
   onLeave,
-
+  
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -359,6 +360,7 @@ export const GameScreen = ({
   const [predictedPos, setPredictedPos] = useState<{ x: number, y: number } | null>(null);
   const settingsCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const SETTINGS_CLOSE_MS = 300;
+
 
   const openSettings = () => {
     if (settingsCloseTimerRef.current != null) {
@@ -924,6 +926,7 @@ export const GameScreen = ({
                   {localPlayerDisplayName ?? (myColor ? getPlayerDisplayLabel(myColor) : "…")}
                 </p>
               </div>
+              {/* Removed Role display for wires level KB 7.23
               {myRole && (
                 <div className="grid min-w-0 gap-1">
                   <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
@@ -934,39 +937,58 @@ export const GameScreen = ({
                   </p>
                 </div>
               )}
-              <div className="flex w-full shrink-0 justify-end gap-0.5 border-t border-white/10 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setControlsOpen(v => !v)}
-                  aria-expanded={controlsOpen}
-                  aria-label="Toggle controls"
-                  title="Controls"
-                  className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-500 transition-colors hover:bg-white/[0.07] hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                >
-                  <Info className="size-3.5" strokeWidth={1.65} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={openSettings}
-                  aria-expanded={settingsOpen}
-                  aria-controls="game-settings-panel"
-                  aria-label="Open settings"
-                  title="Settings"
-                  className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-300 transition-colors hover:bg-white/[0.07] hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                >
-                  <Settings className="size-3.5" strokeWidth={1.65} aria-hidden />
-                </button>
-                {onLeave && (
+                */}
+
+              <div className="flex w-full shrink-0 items-center justify-between gap-x-2 border-t border-white/10 pt-2">
+                <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
+                  <span className="min-w-0 truncate text-[11px] leading-snug text-slate-500">
+                    Click-Drag to Begin
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  {currentLevel === "wires" && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => room?.send("undoWire", {})}
+                        title="Undo last wire"
+                        className="rounded-none border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-300 transition-colors hover:bg-white/10"
+                      >
+                        Undo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => room?.send("resetWiresLevel", {})}
+                        title="Reset level"
+                        className="rounded-none border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-300 transition-colors hover:bg-white/10"
+                      >
+                        Reset
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
-                    onClick={onLeave}
-                    aria-label="Leave game"
-                    title="Leave game"
-                    className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-500 transition-colors hover:bg-white/[0.07] hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                    onClick={openSettings}
+                    aria-expanded={settingsOpen}
+                    aria-controls="game-settings-panel"
+                    aria-label="Open settings"
+                    title="Settings"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-300 transition-colors hover:bg-white/[0.07] hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                   >
-                    <LogOut className="size-3.5" strokeWidth={1.65} aria-hidden />
+                    <Settings className="size-3.5" strokeWidth={1.65} aria-hidden />
                   </button>
-                )}
+                  {onLeave && (
+                    <button
+                      type="button"
+                      onClick={onLeave}
+                      aria-label="Leave game"
+                      title="Leave game"
+                      className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-500 transition-colors hover:bg-white/[0.07] hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                    >
+                      <LogOut className="size-3.5" strokeWidth={1.65} aria-hidden />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -1244,6 +1266,19 @@ export const GameScreen = ({
                     spacing={SPACING}
                   />
                 ))}
+
+              {wiresLevel.activeDrags
+                .filter((drag) => drag.sessionId !== room?.sessionId)
+                .map((drag) => (
+                  <Wire
+                    key={drag.sessionId}
+                    points={drag.points}
+                    color={drag.color}
+                    gridWidth={gridWidth}
+                    gridHeight={gridHeight}
+                    spacing={SPACING}
+                  />
+                ))}
               </>
             )}
 
@@ -1308,6 +1343,7 @@ export const GameScreen = ({
         </div>
       )}
 
+    
       {/* Leave confirmation dialog */}
       {showLeaveConfirm && (
         <div

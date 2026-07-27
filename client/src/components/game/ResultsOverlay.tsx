@@ -19,6 +19,7 @@ export interface ResultsOverlayProps {
   reason: "gameover" | "abandoned";
   returnUrl?: string | null;
   onBack: () => void;
+  onRetry?: () => void;
   players?: PlayerInfo[];
 }
 
@@ -30,6 +31,7 @@ export const ResultsOverlay = ({
   reason,
   returnUrl,
   onBack,
+  onRetry,
   players = [],
 }: ResultsOverlayProps) => {
   const [visible, setVisible] = useState(false);
@@ -101,15 +103,26 @@ export const ResultsOverlay = ({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onBack}
-            className="relative mt-7 flex h-11 w-full items-center justify-center rounded-none border border-solid bg-canvas/50 font-montreal text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px] transition-colors hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25"
-            style={{ borderColor: POLAR_HUD.border }}
-          >
-            <HudCornerLs />
-            <span className="relative z-[1]">{returnUrl ? "Back to platform" : "Main menu"}</span>
-          </button>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="relative mt-3 flex h-11 w-full items-center justify-center rounded-none border border-solid bg-canvas/50 font-montreal text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px] transition-colors hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25"
+              style={{ borderColor: POLAR_HUD.border }}
+            >
+              <HudCornerLs />
+              <span className="relative z-[1]">Retry</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onBack}
+              className="relative mt-7 flex h-11 w-full items-center justify-center rounded-none border border-solid bg-canvas/50 font-montreal text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px] transition-colors hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25"
+              style={{ borderColor: POLAR_HUD.border }}
+            >
+              <HudCornerLs />
+              <span className="relative z-[1]">{returnUrl ? "Back to platform" : "Main menu"}</span>
+            </button>
         </div>
       </div>
     </div>

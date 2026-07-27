@@ -1,4 +1,4 @@
-import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
+import { Schema, type, MapSchema, ArraySchema, } from "@colyseus/schema";
 
 export type PlayerColor = "RED" | "GREEN" | "BLUE";
 export type PlayerRole = "OPERATOR" | "ENGINEER" | "MONITOR";
@@ -63,12 +63,21 @@ export class WireState extends Schema {
   @type([PositionState]) points = new ArraySchema<PositionState>();
 }
 
+//added by KB 7.22 for multiplayer visual drag per player 
+export class ActiveDragState extends Schema {
+  @type("string") sessionId: string = "";
+  @type("string") color: string = "";
+  @type([PositionState]) points = new ArraySchema<PositionState>();
+}
+
 export class WiresLevelState extends Schema {
   @type([WireEndpointState]) endpoints = new ArraySchema<WireEndpointState>();
   @type([WireState]) completedWires = new ArraySchema<WireState>();
   @type(["string"]) usedEndpointIds = new ArraySchema<string>();
   @type("boolean") solved: boolean = false;
+  @type({ map: ActiveDragState }) activeDrags = new MapSchema<ActiveDragState>(); 
 }
+
 
 export class GameState extends Schema {
   @type("number") gridWidth: number = 10;

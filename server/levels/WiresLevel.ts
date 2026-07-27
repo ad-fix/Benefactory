@@ -1,7 +1,8 @@
-import { GameState, WireEndpointState, WireState, PositionState } from "../schema/GameState";
+import { GameState, WireEndpointState, WireState, PositionState, ActiveDragState } from "../schema/GameState";
 import { BaseLevel } from "./BaseLevel";
 import { ArraySchema } from "@colyseus/schema";
 import type { Player } from "../schema/GameState";
+
 
 export class WiresLevel extends BaseLevel {
 
@@ -227,6 +228,28 @@ resetLevel(): void {
 
   this.spawnEndpoints();
   console.log("[WiresLevel] Level reset — new layout generated.");
+}
+
+updateActiveDrag(sessionId: string, color: string, points: { x: number; y: number }[]): void {
+  const ws = this.state.wiresLevel;
+  let drag = ws.activeDrags.get(sessionId);
+  if (!drag) {
+    drag = new ActiveDragState();
+    drag.sessionId = sessionId;
+    ws.activeDrags.set(sessionId, drag);
+  }
+  drag.color = color;
+  while (drag.points.length > 0) drag.points.pop();
+  for (const p of points) {
+    const ps = new PositionState();
+    ps.x = p.x;
+    ps.y = p.y;
+    drag.points.push(ps);
+  }
+}
+
+clearActiveDrag(sessionId: string): void {
+  this.state.wiresLevel.activeDrags.delete(sessionId);
 }
 
 }
