@@ -552,7 +552,7 @@ const Index = () => {
               userId: initPayload.userId,
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
-testLevel: "wires", // TEMP for playtest - swap to "roles" or "conveyor" to test those, or remove entirely once real level-select exists
+              // testLevel: "wires"
             });
 
         connectedRoomIdRef.current = gameRoom.roomId;

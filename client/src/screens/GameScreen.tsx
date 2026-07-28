@@ -810,7 +810,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
            NoiseFieldOverlay + ScoreBurstOverlay moved AFTER the R3F Canvas below. */}
 
       {/* HUD: frosted polar chrome (match timer / stage chips); settings swap into same shell */}
-    <div className="absolute left-4 top-4 z-20 flex w-[min(19rem,calc(100vw-2rem))] flex-col gap-2">
+    <div className="absolute left-4 top-4 z-20 flex w-[min(15rem,calc(100vw-2rem))] flex-col gap-2">
         <div
           className="relative flex flex-col overflow-hidden rounded-none border border-solid bg-canvas/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px]"
           style={{ borderColor: POLAR_HUD.border }}
@@ -934,8 +934,6 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                     Solo mode
                   </p>
                 </div>
-                </div>
-                {/* Commented out in order to adjust the top left info panel KB 7.21
                 <div className="grid min-w-0 gap-1">
                   <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Role
@@ -944,33 +942,20 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                     className="truncate text-base font-medium tabular-nums leading-tight text-slate-200"
                     style={{
                       color: Array.from(players.values())[activePlayerIndex]
-<{/* Commented out in order to adjust the top left info panel KB 7.21
-<div className="grid min-w-0 gap-1">
-  <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
-    Role
-  </p>
-  <p
-    className="truncate text-base font-medium tabular-nums leading-tight text-slate-200"
-    style={{
-      color: Array.from(players.values())[activePlayerIndex]
-        ? ROLE_VISUAL[Array.from(players.values())[activePlayerIndex].role]?.hex
-        : undefined,
-    }}
-  >
-    {Array.from(players.values())[activePlayerIndex]?.role
-      ? Array.from(players.values())[activePlayerIndex].role.charAt(0) + Array.from(players.values())[activePlayerIndex].role.slice(1).toLowerCase()
-      : "…"}
-  </p>
-</div>
-*/}
+                        ? ROLE_VISUAL[Array.from(players.values())[activePlayerIndex].role]?.hex
+                        : undefined,
+                    }}
+                  >
+                    {Array.from(players.values())[activePlayerIndex]?.role
+                      ? Array.from(players.values())[activePlayerIndex].role.charAt(0) + Array.from(players.values())[activePlayerIndex].role.slice(1).toLowerCase()
+                      : "…"}
+                  </p>
+                </div>
+              </div>
 
               <div className="relative z-10 flex min-h-10 w-full shrink-0 flex-nowrap items-center justify-between gap-x-2 border-t border-white/10 px-3 py-2">
                 <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
-                  <span className="min-w-0 truncate text-[11px] leading-snug text-slate-500">
-                    Click-Drag to Begin
-                  </span>
-                </div>
-                <div className="flex shrink-0 items-center gap-0.5">
+              
                   {currentLevel === "wires" && (
                     <>
                       <button
@@ -1065,16 +1050,16 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                 </div>
               )}
               <div className="grid min-w-0 gap-1">
-                <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
-                  You
+              <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                Role
                 </p>
                 <p
-className="truncate text-sm font-medium tabular-nums leading-tight text-slate-200"
-style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
->
-{localPlayerDisplayName ?? (myRole ? myRole.charAt(0) + myRole.slice(1).toLowerCase() : "…")}
-</p>
-</div>
+                className="truncate text-sm font-medium tabular-nums leading-tight text-slate-200"
+                style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
+                >
+                {myRole ? myRole.charAt(0) + myRole.slice(1).toLowerCase() : "…"}
+              </p>
+            </div>
 {/* Removed Role display for wires level KB 7.23
 {myRole && (
   <div className="grid min-w-0 gap-1">
@@ -1090,11 +1075,6 @@ style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
 
 <div className="flex w-full shrink-0 items-center justify-between gap-x-2 border-t border-white/10 pt-2">
   <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
-    <span className="min-w-0 truncate text-[11px] leading-snug text-slate-500">
-      Click-Drag to Begin
-    </span>
-  </div>
-  <div className="flex shrink-0 items-center gap-0.5">
     {currentLevel === "wires" && (
       <>
         <button
@@ -1326,11 +1306,12 @@ style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
 
             
             {/* Players */}
-            {/* Commented out to remove original Polar Winds player shapes KB 7.21 
             {Array.from(players.values()).map((player, index) => {
+              if (currentLevel === "wires") return null;
               if (currentLevel === "roles") {
                 if (isSoloMode && index !== activePlayerIndex) return null;
                 if (!isSoloMode && player.sessionId !== room?.sessionId) return null;
+                
               }
               const isMe = isSoloMode ? index === activePlayerIndex : player.color === myColor;
               // Use predicted position for local player in multiplayer
@@ -1359,7 +1340,7 @@ style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
                 />
               );
             })}
-            */}
+          
 
             {/* Roles level: Monitor-only Operator onion-skin ghost (stage 4) */}
             {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" && (() => {

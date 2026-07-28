@@ -86,7 +86,6 @@ if (options.testLevel === "conveyor") {
 } else if (options.testLevel === "wires") {
   this.state.gridWidth = 7;
   this.state.gridHeight = 6;
-  this.state.timeRemaining = 3 * 60; // 3 minutes for wires level
   this.state.currentLevel = "wires";
   this.currentLevel = new WiresLevel(this.state, () => this.endGame());
 } else {
@@ -708,7 +707,7 @@ this.onMessage("devGiveWirecutter", (client, message: { color: string }) => {
           clearInterval(this.countdownTimer);
           this.countdownTimer = null;
         }
-        this.state.timeRemaining = this.state.currentLevel === "wires" ? 3 * 60 : this.GAME_DURATION;
+        this.state.timeRemaining = this.GAME_DURATION;
         this.gameStartTime = Date.now();
         this.startGameTimer();
         console.log("Countdown complete — game timer started!");
