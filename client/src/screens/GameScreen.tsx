@@ -45,6 +45,7 @@ import {
   ROLE_VISUAL,
 } from "@/constants/playerColors";
 import { WiresFloor } from "@/levels/wires/WiresFloor";
+import { ConfirmModal } from "@/components/game/ConfirmModal";
 
 // Types
 type PlayerColor = "RED" | "GREEN" | "BLUE";
@@ -401,6 +402,8 @@ export const GameScreen = ({
   useAmbientMusic(LEVEL_MUSIC[currentLevel] ?? DEFAULT_LEVEL_MUSIC);
   const [activePopup, setActivePopup] = useState<{ imageUrl: string; label: string; triggerId: number } | null>(null);
   const [wireModalOpen, setWireModalOpen] = useState(false);
+  const [generatorModalOpen, setGeneratorModalOpen] = useState(false);
+  const [doorPrompt, setDoorPrompt] = useState<{ targetLevelId: string } | null>(null);
 const popupCounter = useRef(0);
 
 const showPopup = (imageUrl: string, label: string) => {
@@ -420,6 +423,15 @@ const showPopup = (imageUrl: string, label: string) => {
   const settingsCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const SETTINGS_CLOSE_MS = 300;
 
+ const [transitionKey, setTransitionKey] = useState(0);
+const prevLevelRef = useRef(currentLevel);
+
+useEffect(() => {
+  if (prevLevelRef.current !== currentLevel) {
+    prevLevelRef.current = currentLevel;
+    setTransitionKey((k) => k + 1);
+  }
+}, [currentLevel]);
 
   const openSettings = () => {
     if (settingsCloseTimerRef.current != null) {
@@ -495,6 +507,13 @@ const showPopup = (imageUrl: string, label: string) => {
       }
       // If still pending inputs, keep current predicted position (already calculated)
     };
+
+    const offDoorPrompt = room.onMessage("doorPrompt", (message: { targetLevelId: string }) => {
+  setDoorPrompt(message);
+});
+const offDoorPromptClear = room.onMessage("doorPromptClear", () => {
+  setDoorPrompt(null);
+});
 
     const offPing = room.onMessage("ping", handlePing);
     const offMoveAck = room.onMessage("moveAck", handleMoveAck);
@@ -639,6 +658,19 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
         : Array.from(players.values()).find(p => p.color === myColor);
         if (!currentPlayer) return;
 
+         if (currentLevel === "level1") {
+    const MAX_GRID = 26;
+    const center = Math.floor(MAX_GRID / 2);
+    const minX = center - Math.floor(gridWidth / 2);
+    const minY = center - Math.floor(gridHeight / 2);
+    const doorTileX = minX + 4;   // adjacent to the generator's bottom-left blocked corner, right below
+    const doorTileY = minY + 5;
+    if (currentPlayer.x === doorTileX && currentPlayer.y === doorTileY) {
+      setGeneratorModalOpen(true);
+      return;
+    }
+  }
+
         const target = positionedInteractables.find(
         (item) => item.pickup && item.absX === currentPlayer.x && item.absY === currentPlayer.y
         );
@@ -746,7 +778,10 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
 
     const handleCutWire = (color: WireColor) => {
   if (!myPlayer?.heldWirecutter || !room) return;
-  room.send("cutWire", { color });
+  room.send("cutWire", {
+    color,
+    ...(isSoloMode && myPlayer ? { targetColor: myPlayer.color } : {}),
+  });
 };
 
   const lastHintTileRef = useRef<string | null>(null);
@@ -1236,6 +1271,17 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
         </div>
       )}
 
+      {isDevMode && (
+  <div className="absolute bottom-40 right-8 z-10">
+    <button
+      onClick={() => room?.send("devSolveRoles", {})}
+      className="rounded-none border border-cyan-500/35 bg-cyan-950/50 px-4 py-2 font-montreal text-xs uppercase tracking-wider backdrop-blur-[6px] transition-colors hover:border-cyan-400/50 hover:bg-cyan-950/70"
+    >
+      <p className="text-sm font-bold text-cyan-300">Solve Roles</p>
+    </button>
+  </div>
+)}
+
 
       {/* Main Game Canvas */}
       <CanvasErrorBoundary>
@@ -1281,6 +1327,9 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
     url={LEVEL_MESHES[currentLevel].url}
     position={LEVEL_MESHES[currentLevel].position}
     scale={LEVEL_MESHES[currentLevel].scale}
+    onClickNode={(nodeName) => {
+      if (nodeName === "generator door") setGeneratorModalOpen(true);
+    }}
   />
 )}
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
@@ -1296,9 +1345,6 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
           if (item.id === "bomb") {
           setWireModalOpen(true);
           return;
-          }
-          if (!item.pickup) {
-          showPopup(item.imageUrl, item.label);
           } 
        }}
       />
@@ -1498,6 +1544,17 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
       
+    
+      {transitionKey > 0 && (
+  <div key={transitionKey} className="pointer-events-none fixed inset-0 z-[100] bg-black" style={{ animation: "levelFadeIn 2s ease-out forwards" }} />
+)}
+<style>{`
+  @keyframes levelFadeIn {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+`}</style>
+
       {/*inventory*/}
       <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
         <div className="flex size-16 items-center justify-center border border-dashed border-white/20">
@@ -1506,6 +1563,29 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
           ) : null}
         </div>
       </div>
+
+      {/* before entering generator for wires puzzle*/}
+      {generatorModalOpen && (
+  <ConfirmModal
+    message="Turn on the generator?"
+    onConfirm={() => {
+      room?.send("enterGenerator", {});
+      setGeneratorModalOpen(false);
+    }}
+    onCancel={() => setGeneratorModalOpen(false)}
+  />
+)}
+
+{doorPrompt && (
+  <ConfirmModal
+    message={`Move to ${doorPrompt.targetLevelId}?`}
+    onConfirm={() => {
+      room?.send("confirmDoorTransition", {});
+      setDoorPrompt(null);
+    }}
+    onCancel={() => setDoorPrompt(null)}
+  />
+)}
 
       {wireModalOpen && (
         <WireSelectionModal

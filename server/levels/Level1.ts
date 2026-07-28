@@ -38,7 +38,7 @@ export class Level1 extends BaseLevel {
   }
 
   isLevelComplete(): boolean {
-    return false; // no win condition yet
+  return this.state.wiresLevel.solved;
   }
 
   onDispose(): void {
