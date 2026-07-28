@@ -54,7 +54,7 @@ export function PolarWindsTitle() {
     const meshRef = useRef<THREE.Mesh>(null);
     const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null);
 
-    const fontUrl = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/fonts/helvetiker_bold.typeface.json";
+    const fontUrl = "/fonts/DroogHeavy.json"
 
     useEffect(() => {
         if (meshRef.current?.geometry) {
@@ -73,7 +73,7 @@ export function PolarWindsTitle() {
             <Text3D
                 ref={meshRef}
                 font={fontUrl}
-                size={0.8}
+                size={0.6}
                 height={0.1}
                 curveSegments={12}
                 bevelEnabled
@@ -82,7 +82,7 @@ export function PolarWindsTitle() {
                 bevelOffset={0}
                 bevelSegments={3}
             >
-                POLAR WINDS
+                Benefactory
                 {/* Invisible main mesh body */}
                 <meshBasicMaterial visible={false} />
             </Text3D>

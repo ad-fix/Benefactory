@@ -43,32 +43,32 @@ export const ButtonDot = ({ button, position, matchedBehaviorType, cooldownUntil
   const hex = COLOR_MAP[button.color] ?? "#ffffff";
   const auraTexture = useMemo(() => makeAuraTexture(hex), [hex]);
 
-  // Operator: aura tracks isActive. Engineer: aura tracks matched operator's behaviorType.
-  const showAura = matchedBehaviorType !== undefined
+  // Operator: lit tracks isActive. Engineer: lit tracks matched operator's behaviorType.
+  const isLit = matchedBehaviorType !== undefined
     ? matchedBehaviorType === "TOGGLE"
     : button.isActive;
 
   const mainMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
   const auraMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
 
-  const baseEmissiveIntensity = button.isActive ? 1.5 : 0.15;
-  const baseOpacity = button.isActive ? 1 : 0.45;
+  const baseEmissiveIntensity = isLit ? 1.5 : 0.15;
+  const baseOpacity = isLit ? 1 : 0.45;
 
   useFrame(() => {
     const isLocked = !!cooldownUntil && Date.now() < cooldownUntil;
     if (mainMaterialRef.current) {
-      mainMaterialRef.current.emissiveIntensity = isLocked ? baseEmissiveIntensity * 0.2 : baseEmissiveIntensity;
-      mainMaterialRef.current.opacity = isLocked ? baseOpacity * 0.35 : baseOpacity;
+      mainMaterialRef.current.emissiveIntensity = isLocked ? baseEmissiveIntensity * 0.45 : baseEmissiveIntensity;
+      mainMaterialRef.current.opacity = isLocked ? baseOpacity * 0.6 : baseOpacity;
     }
     if (auraMaterialRef.current) {
-      auraMaterialRef.current.opacity = isLocked ? 0.25 : 1;
+      auraMaterialRef.current.opacity = isLocked ? 0.5 : 1;
     }
   });
 
   return (
     <>
       {/* Soft aura — radial gradient plane, additive blending, no hard edge */}
-      {showAura && (
+      {isLit && (
         <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[2.4, 2.4]} />
           <meshBasicMaterial

@@ -1,6 +1,6 @@
 /** Cold polar HUD chrome (sky / ice) — shared by game HUD and lobby panels. */
 export const POLAR_HUD = {
-  border: "rgba(56, 189, 248, 0.2)",
+  border: "rgba(72, 160, 146, 0.5)",
   barBorder: "rgba(56, 189, 248, 0.2)",
   barInset: "rgba(14, 165, 233, 0.2)",
   connectorFrom: "rgba(255,255,255,0.2)",

@@ -3,6 +3,8 @@ import { GameState, Player, PlayerColor, PlayerRole } from "../schema/GameState"
 import { LiveKitService } from "../services/LiveKitService";
 import { BaseLevel } from "../levels/BaseLevel";
 import { RolesLevel } from "../levels/RolesLevel";
+import { Level1 } from "../levels/Level1";
+import { ConveyorLevel } from "../levels/ConveyorLevel";
 import jwt from "jsonwebtoken";
 import { WiresLevel } from "../levels/WiresLevel"; //added by KB 7.20.26
 
@@ -75,16 +77,22 @@ export class GameRoom extends Room<GameState> {
     this.state.gridWidth = this.INITIAL_VISIBLE_WIDTH;
     this.state.gridHeight = this.INITIAL_VISIBLE_HEIGHT;
 
-    this.state.currentLevel = options.level ?? "roles"; //added by KB 7.20.26
-
-    if (this.state.currentLevel === "wires") {
-      this.state.gridWidth = 7;
-      this.state.gridHeight = 6;
-      this.state.timeRemaining = 3 * 60; // Updated by KB 7.27 - 3 minutes for wires level
-      this.currentLevel = new WiresLevel(this.state);
-    } else {
-      this.currentLevel = new RolesLevel(this.state);
-    }
+if (options.testLevel === "conveyor") {
+  this.state.currentLevel = "conveyor";
+  this.currentLevel = new ConveyorLevel(this.state);
+} else if (options.testLevel === "roles") {
+  this.state.currentLevel = "roles";
+  this.currentLevel = new RolesLevel(this.state);
+} else if (options.testLevel === "wires") {
+  this.state.gridWidth = 7;
+  this.state.gridHeight = 6;
+  this.state.timeRemaining = 3 * 60; // 3 minutes for wires level
+  this.state.currentLevel = "wires";
+  this.currentLevel = new WiresLevel(this.state);
+} else {
+  this.state.currentLevel = "level1";
+  this.currentLevel = new Level1(this.state);
+}
 
     console.log("Initial state set");
 
@@ -143,6 +151,7 @@ export class GameRoom extends Room<GameState> {
         player.x = newX;
         player.y = newY;
         this.currentLevel.onPlayerMove(player, newX, newY);
+        this.state.currentLevelComplete = this.currentLevel?.isLevelComplete() ?? false;
 
         // Log move for replay
         this.logEvent({ e: "move", p: this.userIds.get(playerKey) || playerKey, d: direction, x: newX, y: newY });
@@ -153,6 +162,49 @@ export class GameRoom extends Room<GameState> {
         client.send("moveAck", { seq: message.seq, x: player.x, y: player.y });
       }
     });
+
+    this.onMessage("pickupItem", (client, message: { itemId: string; wirecutterColor: string; targetColor?: "RED" | "GREEN" | "BLUE" }) => {
+      let player: Player | undefined;
+
+      if (this.isSoloMode && message.targetColor) {
+    this.state.players.forEach((p) => {
+      if (p.color === message.targetColor) player = p;
+      });
+    } else {
+      player = this.state.players.get(client.sessionId);
+    }
+
+      if (!player) return;
+      if (player.heldWirecutter) return;
+      if (this.state.collectedItems.has(message.itemId)) return;
+      this.state.collectedItems.add(message.itemId);
+      player.heldWirecutter = message.wirecutterColor;
+    });
+
+      this.onMessage("cutWire", (client, message: { color: string }) => {
+  const player = this.state.players.get(client.sessionId);
+  if (!player) return;
+  if (!player.heldWirecutter) return;                 // must be holding a wirecutter
+  if (this.state.bombDefused || this.state.bombExploded) return; // bomb already resolved
+
+  const CORRECT_WIRES = ["red", "green", "blue"];
+  player.heldWirecutter = "";                          // consumed on any attempt, right or wrong
+
+  if (!CORRECT_WIRES.includes(message.color)) {
+    this.state.bombExploded = true;
+    this.state.isGameOver = true;
+    return;
+  }
+
+  if (!this.state.cutWires.includes(message.color)) {
+    this.state.cutWires.push(message.color);
+  }
+
+  if (this.state.cutWires.length === CORRECT_WIRES.length) {
+    this.state.bombDefused = true;
+    this.state.isGameOver = true;
+  }
+  });
 
     // Handle ping - just broadcast to all clients, don't store in state
     this.onMessage("ping", (client, message: PingMessage) => {
@@ -198,37 +250,45 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
-    // Handle wire drawing (wires level) updated by KB 7.21.26
-    this.onMessage("drawWire", (client, message: { color: string; points: { x: number; y: number }[] }) => {
-      if (this.currentLevel instanceof WiresLevel) {
-        const success = this.currentLevel.submitWire(message.points, message.color);
-        console.log(`[WiresLevel] drawWire from ${client.sessionId}: ${success ? "ACCEPTED" : "REJECTED"}`);
-      }
-    });
+// Handle wire drawing (wires level) updated by KB 7.21.26; conflict update by KB 7.27
+this.onMessage("drawWire", (client, message: { color: string; points: { x: number; y: number }[] }) => {
+  if (this.currentLevel instanceof WiresLevel) {
+    const success = this.currentLevel.submitWire(message.points, message.color);
+    console.log(`[WiresLevel] drawWire from ${client.sessionId}: ${success ? "ACCEPTED" : "REJECTED"}`);
+  }
+});
 
-    this.onMessage("undoWire", (client) => {
-      if (this.currentLevel instanceof WiresLevel) {
-        this.currentLevel.undoLastWire();
-      }
-    });
+this.onMessage("undoWire", (client) => {
+  if (this.currentLevel instanceof WiresLevel) {
+    this.currentLevel.undoLastWire();
+  }
+});
 
-    this.onMessage("resetWiresLevel", (client) => {
-      if (this.currentLevel instanceof WiresLevel) {
-        this.currentLevel.resetLevel();
-      }
-    });
+this.onMessage("resetWiresLevel", (client) => {
+  if (this.currentLevel instanceof WiresLevel) {
+    this.currentLevel.resetLevel();
+  }
+});
 
-    this.onMessage("dragProgress", (client, message: { color: string; points: { x: number; y: number }[] }) => {
-      if (this.currentLevel instanceof WiresLevel) {
-        this.currentLevel.updateActiveDrag(client.sessionId, message.color, message.points);
-      }
-    });
+this.onMessage("dragProgress", (client, message: { color: string; points: { x: number; y: number }[] }) => {
+  if (this.currentLevel instanceof WiresLevel) {
+    this.currentLevel.updateActiveDrag(client.sessionId, message.color, message.points);
+  }
+});
 
-    this.onMessage("dragEnd", (client) => {
-      if (this.currentLevel instanceof WiresLevel) {
-        this.currentLevel.clearActiveDrag(client.sessionId);
-      }
-    });
+this.onMessage("dragEnd", (client) => {
+  if (this.currentLevel instanceof WiresLevel) {
+    this.currentLevel.clearActiveDrag(client.sessionId);
+  }
+});
+
+// Giving wirecutters for testing bomb wire cutting
+this.onMessage("devGiveWirecutter", (client, message: { color: string }) => {
+  if (!this.isDevMode) return;
+  const player = this.state.players.get(client.sessionId);
+  if (!player) return;
+  player.heldWirecutter = message.color;
+});
 
     // Handle dev role switcher
     this.onMessage("devSetRole", (client, message: { role: string }) => {
@@ -726,7 +786,7 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
-  private startGameTimer() {
+private startGameTimer() {
   this.gameTimer = setInterval(() => {
     if (this.state.timeRemaining > 0) {
       this.state.timeRemaining--;

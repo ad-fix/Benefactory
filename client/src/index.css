@@ -3,25 +3,16 @@
 @tailwind utilities;
 
 @font-face {
-  font-family: "PP Supply Mono";
-  src: url("/.fonts/PPSupplyMono-Variable.woff2") format("woff2");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "HF Lorflo";
-  src: url("/fonts/HF Lorflo Regular.woff2") format("woff2");
+  font-family: "Clash Grotesk";
+  src: url("/fonts/ClashGrotesk-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
-  font-family: "PP Neue Montreal";
-  src: url("/fonts/PPNeueMontreal-Variable.woff2") format("woff2");
-  font-weight: 100 900;
+  font-family: "Droog Heavy";
+  src: url("/fonts/DroogHeavy.woff2") format("woff2");
+  font-weight: 900;
   font-style: normal;
   font-display: swap;
 }
@@ -79,16 +70,16 @@ All colors MUST be HSL.
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Game shell (also in `.dark`); defined here so `bg-canvas` never resolves empty if `class="dark"` is missing */
-    --canvas: 226 48% 4%;
+    --canvas: 234 52% 10%;
     --canvas-elevated: 224 36% 8%;
-    --hairline: 218 16% 22%;
+    --hairline: 170 55% 63%;
   }
 
   .dark {
     /* Very dark blue void + technical hairlines (brutalist / dark shell) */
-    --canvas: 226 48% 4%;
+    --canvas: 234 52% 10%;
     --canvas-elevated: 224 36% 8%;
-    --hairline: 218 16% 22%;
+    --hairline: 170 55% 63%;
 
     --background: 226 48% 4%;
     --foreground: 218 14% 94%;
@@ -134,7 +125,7 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground antialiased font-sans;
   }
 
   html.dark {
@@ -185,7 +176,7 @@ All colors MUST be HSL.
 
 /* Sonner — match in-game polar HUD (glass + hairline; vars also on Toaster inline style) */
 [data-sonner-toaster] {
-  font-family: "PP Supply Mono", ui-monospace, monospace, system-ui, sans-serif !important;
+  font-family: "Clash Grotesk", sans-serif !important;
 }
 
 [data-sonner-toaster] [data-sonner-toast][data-styled="true"] {

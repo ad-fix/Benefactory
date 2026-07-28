@@ -14,9 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        "pp-mono": ['"PP Supply Mono"', "ui-monospace", "monospace"],
-        "lorflo": ['"HF Lorflo"', "sans-serif"],
-        "montreal": ['"PP Neue Montreal"', "sans-serif"],
+        sans: ['"Clash Grotesk"', "sans-serif"],
+        droog: ['"Droog Heavy"', "sans-serif"],
+
       },
       colors: {
         canvas: {
