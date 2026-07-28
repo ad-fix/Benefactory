@@ -88,7 +88,7 @@ if (options.testLevel === "conveyor") {
   this.state.gridHeight = 6;
   this.state.timeRemaining = 3 * 60; // 3 minutes for wires level
   this.state.currentLevel = "wires";
-  this.currentLevel = new WiresLevel(this.state);
+  this.currentLevel = new WiresLevel(this.state, () => this.endGame());
 } else {
   this.state.currentLevel = "level1";
   this.currentLevel = new Level1(this.state);

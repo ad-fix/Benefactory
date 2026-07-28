@@ -5,6 +5,12 @@ import type { Player } from "../schema/GameState";
 
 
 export class WiresLevel extends BaseLevel {
+  private onLevelWon?: () => void;
+
+  constructor(state: GameState, onLevelWon?: () => void) {
+    super(state);
+    this.onLevelWon = onLevelWon;
+  }
 
 //added by KB 7.21 to generate puzzle 
 onLevelStart(): void {
@@ -166,6 +172,7 @@ submitWire(points: { x: number; y: number }[], color: string): boolean {
   if (this.isLevelComplete()) {
     ws.solved = true;
     console.log("[WiresLevel] LEVEL SOLVED!");
+    this.onLevelWon?.();
   }
 
   return true;
