@@ -106,6 +106,13 @@ interface ServerGameState {
     statusMessage: string;
     complete: boolean;
   };
+  wiresLevel?: {
+    endpoints: Map<string, { id: string; x: number; y: number; color: string }>;
+    completedWires: Map<string, { color: string; points: Map<string, { x: number; y: number }> }>;
+    usedEndpointIds: Map<string, string>;
+    solved: boolean;
+    activeDrags: { sessionId: string; color: string; points: { x: number; y: number }[] }[];
+  };
 }
 
 interface ButtonLocal {
@@ -150,6 +157,15 @@ interface ConveyorLevelLocal {
   complete: boolean;
 }
 
+//added by KB 7.20
+interface WiresLevelLocal {
+  endpoints: { id: string; x: number; y: number; color: string }[];
+  completedWires: { color: string; points: { x: number; y: number }[] }[];
+  usedEndpointIds: string[];
+  solved: boolean;
+  activeDrags: { sessionId: string; color: string; points: { x: number; y: number }[] }[];
+}
+
 // Batched game state — updated atomically via reducer
 interface GameStateLocal {
   gridWidth: number;
@@ -167,6 +183,7 @@ interface GameStateLocal {
   bombDefused?: boolean;
   bombExploded?: boolean; 
   rolesLevel: RolesLevelLocal;
+  wiresLevel: WiresLevelLocal; //added by KB 7.20
   conveyorLevel: ConveyorLevelLocal;
 }
 
@@ -188,8 +205,8 @@ const initialGameState: GameStateLocal = {
   bombDefused: false,
   bombExploded: false,
   rolesLevel: { stage: 1, lights: 0, frozen: false, operatorButtons: [], engineerButtons: [], confirmationX: -1, confirmationY: -1, confirmationVisible: false, confirmationExpiresAt: 0, expiryCount: 0, slowedUntilBySession: new Map(), hiddenEngineerColor: "", engineerSwitchX: -1, engineerSwitchY: -1, flipCooldownByColor: new Map(), blueCutterFor: "", redCutterFor: "" },
+  wiresLevel: { endpoints: [], completedWires: [], usedEndpointIds: [], solved: false, activeDrags: [] }, //added by KB 7.20
   conveyorLevel: { stage: 1, conveyors: [], machines: [], itemX: 0, itemY: 0, processedCount: 0, itemState: "RAW_PART", statusMessage: "Waiting for factory layout...", complete: false },
-
 };
 
 function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal {
@@ -264,6 +281,7 @@ const Index = () => {
 
   // Show results overlay when game ends (stay on /play so LiveKit voice persists)
   useEffect(() => {
+    console.log("isGameOver effect check:", gameState.isGameOver);
     if (!gameState.isGameOver) return;
 
     room?.leave();
@@ -321,6 +339,29 @@ const Index = () => {
       flipCooldownByColor.set(color, until);
     });
 
+    //added by KB 7.20.26
+    const wl = gameRoom.state.wiresLevel;
+    const endpoints: { id: string; x: number; y: number; color: string }[] = [];
+    wl?.endpoints?.forEach((e) => {
+      endpoints.push({ id: e.id, x: e.x, y: e.y, color: e.color });
+    });
+    const completedWires: { color: string; points: { x: number; y: number }[] }[] = [];
+    wl?.completedWires?.forEach((w) => {
+      const points: { x: number; y: number }[] = [];
+      w.points?.forEach((p) => points.push({ x: p.x, y: p.y }));
+      completedWires.push({ color: w.color, points });
+    });
+    const usedEndpointIds: string[] = [];
+    wl?.usedEndpointIds?.forEach((id) => usedEndpointIds.push(id));
+    const solved = wl?.solved ?? false;
+    
+    const activeDrags: { sessionId: string; color: string; points: { x: number; y: number }[] }[] = [];
+    wl?.activeDrags?.forEach((drag) => {
+      const points: { x: number; y: number }[] = [];
+      drag.points?.forEach((p) => points.push({ x: p.x, y: p.y }));
+      activeDrags.push({ sessionId: drag.sessionId, color: drag.color, points });
+    });
+
     dispatch({
       type: "SYNC_STATE",
       payload: {
@@ -357,17 +398,25 @@ const Index = () => {
           blueCutterFor: rl?.blueCutterFor ?? "",
           redCutterFor: rl?.redCutterFor ?? "",
         },
+//updated by KB 7.22.26
+        wiresLevel: {
+          endpoints,
+          completedWires,
+          usedEndpointIds,
+          solved,
+          activeDrags,
+        },
         conveyorLevel: {
-  stage: cl?.stage ?? 1,
-  conveyors: cl?.conveyors ? Array.from(cl.conveyors) : [],
-  machines: cl?.machines ? Array.from(cl.machines) : [],
-  itemX: cl?.itemX ?? 0,
-  itemY: cl?.itemY ?? 0,
-  processedCount: cl?.processedCount ?? 0,
-  itemState: cl?.itemState ?? "RAW_PART",
-  statusMessage: cl?.statusMessage ?? "Waiting for factory layout...",
-  complete: cl?.complete ?? false,
-},
+          stage: cl?.stage ?? 1,
+          conveyors: cl?.conveyors ? Array.from(cl.conveyors) : [],
+          machines: cl?.machines ? Array.from(cl.machines) : [],
+          itemX: cl?.itemX ?? 0,
+          itemY: cl?.itemY ?? 0,
+          processedCount: cl?.processedCount ?? 0,
+          itemState: cl?.itemState ?? "RAW_PART",
+          statusMessage: cl?.statusMessage ?? "Waiting for factory layout...",
+          complete: cl?.complete ?? false,
+        },
       },
     });
   }, [myColor]);
@@ -503,9 +552,7 @@ const Index = () => {
               userId: initPayload.userId,
               playerName: initPayload.playerName,
               devMode: initPayload.devMode,
-              // testLevel: "conveyor", // temporary conveyor testing
-              // testLevel: "roles", // temporary roles testing
-              
+testLevel: "wires", // TEMP for playtest - swap to "roles" or "conveyor" to test those, or remove entirely once real level-select exists
             });
 
         connectedRoomIdRef.current = gameRoom.roomId;
@@ -667,9 +714,11 @@ const Index = () => {
         onBgMusicVolumeChange={initPayload?.bgMusicUrl ? setBgMusicVolume : undefined}
         challengeName={initPayload?.challengeName}
         rolesLevel={gameState.rolesLevel}
+        wiresLevel={gameState.wiresLevel}
         conveyorLevel={gameState.conveyorLevel}
         onLeave={handleLeave}
       />
+
        {/* TODO: revert — temporarily showing overlay in solo mode */}
       <PlatformVoiceOverlay
         participants={voice.participants}
@@ -817,6 +866,23 @@ const Index = () => {
             } else {
               navigate("/", { replace: true });
             }
+          }}
+           onRetry={() => {
+            const serverUrl =
+              import.meta.env.VITE_SERVER_URL ||
+              (import.meta.env.DEV
+                ? "ws://localhost:2567"
+                : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`);
+            const newPayload = {
+              serverUrl,
+              userId: crypto.randomUUID(),
+              playerName: initPayload?.playerName ?? "Player",
+              isAdmin: false,
+              devMode: import.meta.env.DEV,
+              soloMode: initPayload?.soloMode ?? true,
+              level: "wires",
+            };
+            navigate("/play", { state: { initPayload: newPayload }, replace: true });
           }}
         />
       )}
