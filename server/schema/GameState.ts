@@ -1,6 +1,5 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { SetSchema } from "@colyseus/schema";
-// ...
 
 export type PlayerColor = "RED" | "GREEN" | "BLUE";
 export type PlayerRole = "OPERATOR" | "ENGINEER" | "MONITOR";
@@ -55,6 +54,34 @@ export class RolesLevelState extends Schema {
   @type("string") redCutterFor: string = "";
 }
 
+//this block added by KB 7.20.26
+export class WireEndpointState extends Schema {
+  @type("number") x: number = 0;
+  @type("number") y: number = 0;
+  @type("string") color: string = "";
+  @type("string") id: string = "";
+}
+
+export class WireState extends Schema {
+  @type("string") color: string = "";
+  @type([PositionState]) points = new ArraySchema<PositionState>();
+}
+
+//added by KB 7.22 for multiplayer visual drag per player 
+export class ActiveDragState extends Schema {
+  @type("string") sessionId: string = "";
+  @type("string") color: string = "";
+  @type([PositionState]) points = new ArraySchema<PositionState>();
+}
+
+export class WiresLevelState extends Schema {
+  @type([WireEndpointState]) endpoints = new ArraySchema<WireEndpointState>();
+  @type([WireState]) completedWires = new ArraySchema<WireState>();
+  @type(["string"]) usedEndpointIds = new ArraySchema<string>();
+  @type("boolean") solved: boolean = false;
+  @type({ map: ActiveDragState }) activeDrags = new MapSchema<ActiveDragState>();
+}
+
 export class ConveyorState extends Schema {
   @type("string") id: string = "";
   @type("number") startX: number = 0;
@@ -107,15 +134,16 @@ export class GameState extends Schema {
 
   @type(RolesLevelState) rolesLevel = new RolesLevelState();
 
-  @type(ConveyorLevelState)
-  conveyorLevel = new ConveyorLevelState();
+@type(WiresLevelState) wiresLevel = new WiresLevelState(); //added by KB 7.20.26
 
-  @type({ set: "string" }) collectedItems = new SetSchema<string>();
+@type(ConveyorLevelState)
+conveyorLevel = new ConveyorLevelState();
 
-  @type("boolean") currentLevelComplete: boolean = false;
+@type({ set: "string" }) collectedItems = new SetSchema<string>();
 
-  @type("boolean") bombDefused: boolean = false;
-  @type("boolean") bombExploded: boolean = false;
-  @type({ array: "string" }) cutWires = new ArraySchema<string>();
+@type("boolean") currentLevelComplete: boolean = false;
 
+@type("boolean") bombDefused: boolean = false;
+@type("boolean") bombExploded: boolean = false;
+@type({ array: "string" }) cutWires = new ArraySchema<string>();
 }

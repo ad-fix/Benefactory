@@ -30,6 +30,7 @@ import { DevStageControls } from "@/components/game/DevStageControls";
 import { GameControls } from "@/components/game/GameControls";
 import { RolesLevelView } from "@/levels/roles/RolesLevelView";
 import { ButtonDot } from "@/levels/roles/ButtonDot";
+import { Wire } from "@/levels/wires/Wire"; //added by KB 7.20.26
 import { ConfirmationTile } from "@/levels/roles/ConfirmationTile";
 import { SwitchTile } from "@/levels/roles/SwitchTile";
 import { StageLights } from "@/levels/roles/StageLights";
@@ -43,6 +44,7 @@ import {
   PLAYER_HEX,
   ROLE_VISUAL,
 } from "@/constants/playerColors";
+import { WiresFloor } from "@/levels/wires/WiresFloor";
 
 // Types
 type PlayerColor = "RED" | "GREEN" | "BLUE";
@@ -117,6 +119,15 @@ interface ConveyorLevelLocal {
   itemState: string;
   statusMessage: string;
   complete: boolean;
+}
+
+//updated by KB 7.21
+interface WiresLevelLocal {
+  endpoints: { id: string; x: number; y: number; color: string }[];
+  completedWires: { color: string; points: { x: number; y: number }[] }[];
+  usedEndpointIds: string[];
+  solved: boolean;
+  activeDrags: { sessionId: string; color: string; points: { x: number; y: number }[] }[];
 }
 
 interface Ping {
@@ -278,6 +289,7 @@ interface GameScreenProps {
   onBgMusicVolumeChange?: (volume: number) => void;
   challengeName?: string;
   rolesLevel?: RolesLevelLocal;
+  wiresLevel?: WiresLevelLocal;
   conveyorLevel?: ConveyorLevelLocal;
   onLeave?: () => void;
 }
@@ -380,8 +392,10 @@ export const GameScreen = ({
   onBgMusicVolumeChange,
   challengeName,
   rolesLevel,
+  wiresLevel, //added by KB 7.20.26
   conveyorLevel,
   onLeave,
+  
 }: GameScreenProps) => {
   const { play: playSound, sfxVolume, setSfxVolume } = useSounds();
   useAmbientMusic(LEVEL_MUSIC[currentLevel] ?? DEFAULT_LEVEL_MUSIC);
@@ -405,6 +419,7 @@ const showPopup = (imageUrl: string, label: string) => {
   const [predictedPos, setPredictedPos] = useState<{ x: number, y: number } | null>(null);
   const settingsCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const SETTINGS_CLOSE_MS = 300;
+
 
   const openSettings = () => {
     if (settingsCloseTimerRef.current != null) {
@@ -780,6 +795,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
   return (
     <div className="isolate w-full h-screen relative overflow-hidden bg-canvas">
       {/* Cloud nebula backdrop is rendered inside the R3F Canvas (NebulaBackdrop). */}
+      {/* Commented out to get rid of background smokey effect KB 7.21
       <div
         className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-canvas/25 via-transparent to-transparent"
         aria-hidden
@@ -788,12 +804,13 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
         className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_100%_70%_at_50%_45%,transparent_35%,hsl(222_45%_6%/0.35)_100%)]"
         aria-hidden
       />
+      */}
       {/* NOTE: PolarAmbientParticlesCanvas & NoiseBlobFieldCanvas removed —
            hidden behind opaque R3F Canvas (z-[1]), wasted WebGL contexts.
            NoiseFieldOverlay + ScoreBurstOverlay moved AFTER the R3F Canvas below. */}
 
       {/* HUD: frosted polar chrome (match timer / stage chips); settings swap into same shell */}
-      <div className="absolute left-4 top-4 z-20 flex w-[min(14rem,calc(100vw-2rem))] flex-col gap-2">
+    <div className="absolute left-4 top-4 z-20 flex w-[min(19rem,calc(100vw-2rem))] flex-col gap-2">
         <div
           className="relative flex flex-col overflow-hidden rounded-none border border-solid bg-canvas/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px]"
           style={{ borderColor: POLAR_HUD.border }}
@@ -917,6 +934,8 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                     Solo mode
                   </p>
                 </div>
+                </div>
+                {/* Commented out in order to adjust the top left info panel KB 7.21
                 <div className="grid min-w-0 gap-1">
                   <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Role
@@ -925,18 +944,56 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                     className="truncate text-base font-medium tabular-nums leading-tight text-slate-200"
                     style={{
                       color: Array.from(players.values())[activePlayerIndex]
-                        ? ROLE_VISUAL[Array.from(players.values())[activePlayerIndex].role]?.hex
-                          : undefined,
-                        }}
-                        >
-                        {Array.from(players.values())[activePlayerIndex]?.role
-                        ? Array.from(players.values())[activePlayerIndex].role.charAt(0) + Array.from(players.values())[activePlayerIndex].role.slice(1).toLowerCase()
-                        : "…"}
-                      </p>
-                    </div>
-              </div>
+<{/* Commented out in order to adjust the top left info panel KB 7.21
+<div className="grid min-w-0 gap-1">
+  <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
+    Role
+  </p>
+  <p
+    className="truncate text-base font-medium tabular-nums leading-tight text-slate-200"
+    style={{
+      color: Array.from(players.values())[activePlayerIndex]
+        ? ROLE_VISUAL[Array.from(players.values())[activePlayerIndex].role]?.hex
+        : undefined,
+    }}
+  >
+    {Array.from(players.values())[activePlayerIndex]?.role
+      ? Array.from(players.values())[activePlayerIndex].role.charAt(0) + Array.from(players.values())[activePlayerIndex].role.slice(1).toLowerCase()
+      : "…"}
+  </p>
+</div>
+*/}
 
               <div className="relative z-10 flex min-h-10 w-full shrink-0 flex-nowrap items-center justify-between gap-x-2 border-t border-white/10 px-3 py-2">
+                <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
+                  <span className="min-w-0 truncate text-[11px] leading-snug text-slate-500">
+                    Click-Drag to Begin
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  {currentLevel === "wires" && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => room?.send("undoWire", {})}
+                        title="Undo last wire"
+                        className="rounded-none border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-300 transition-colors hover:bg-white/10"
+                      >
+                        Undo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => room?.send("resetWiresLevel", {})}
+                        title="Reset level"
+                        className="rounded-none border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-300 transition-colors hover:bg-white/10"
+                      >
+                        Reset
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Commented out to take away TAB indicator and replace with relevant info^ in top left panel KB 7.21
                 <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
                   <kbd
                     className="inline-flex shrink-0 items-center rounded-none border border-solid bg-canvas/50 px-1.5 py-0.5 font-montreal text-[16px] font-medium uppercase tracking-[0.1em] text-slate-400"
@@ -948,7 +1005,10 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                     Switch player
                   </span>
                 </div>
+                */}
+
                 <div className="flex shrink-0 items-center gap-0.5">
+                  {/* Commented out to take away Info button in top left panel KB 7.21
                   <button
                     type="button"
                     onClick={() => setControlsOpen(v => !v)}
@@ -959,6 +1019,8 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                   >
                     <Info className="size-3.5" strokeWidth={1.65} aria-hidden />
                   </button>
+                  */}
+
                   <button
                     type="button"
                     onClick={openSettings}
@@ -1007,46 +1069,76 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                   You
                 </p>
                 <p
-                  className="truncate text-sm font-medium tabular-nums leading-tight text-slate-200"
-                  style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
-                  >
-                  {localPlayerDisplayName ?? (myRole ? myRole.charAt(0) + myRole.slice(1).toLowerCase() : "…")}
-                  </p>
-                  </div>
-              <div className="flex w-full shrink-0 justify-end gap-0.5 border-t border-white/10 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setControlsOpen(v => !v)}
-                  aria-expanded={controlsOpen}
-                  aria-label="Toggle controls"
-                  title="Controls"
-                  className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-500 transition-colors hover:bg-white/[0.07] hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                >
-                  <Info className="size-3.5" strokeWidth={1.65} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={openSettings}
-                  aria-expanded={settingsOpen}
-                  aria-controls="game-settings-panel"
-                  aria-label="Open settings"
-                  title="Settings"
-                  className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-300 transition-colors hover:bg-white/[0.07] hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                >
-                  <Settings className="size-3.5" strokeWidth={1.65} aria-hidden />
-                </button>
-                {onLeave && (
-                  <button
-                    type="button"
-                    onClick={onLeave}
-                    aria-label="Leave game"
-                    title="Leave game"
-                    className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-500 transition-colors hover:bg-white/[0.07] hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                  >
-                    <LogOut className="size-3.5" strokeWidth={1.65} aria-hidden />
-                  </button>
-                )}
-              </div>
+className="truncate text-sm font-medium tabular-nums leading-tight text-slate-200"
+style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
+>
+{localPlayerDisplayName ?? (myRole ? myRole.charAt(0) + myRole.slice(1).toLowerCase() : "…")}
+</p>
+</div>
+{/* Removed Role display for wires level KB 7.23
+{myRole && (
+  <div className="grid min-w-0 gap-1">
+    <p className="font-montreal text-[9px] uppercase leading-none tracking-[0.12em] text-slate-500">
+      Role
+    </p>
+    <p className="truncate text-xs font-medium tabular-nums leading-tight text-slate-200">
+      {myRole}
+    </p>
+  </div>
+)}
+  */}
+
+<div className="flex w-full shrink-0 items-center justify-between gap-x-2 border-t border-white/10 pt-2">
+  <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
+    <span className="min-w-0 truncate text-[11px] leading-snug text-slate-500">
+      Click-Drag to Begin
+    </span>
+  </div>
+  <div className="flex shrink-0 items-center gap-0.5">
+    {currentLevel === "wires" && (
+      <>
+        <button
+          type="button"
+          onClick={() => room?.send("undoWire", {})}
+          title="Undo last wire"
+          className="rounded-none border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-300 transition-colors hover:bg-white/10"
+        >
+          Undo
+        </button>
+        <button
+          type="button"
+          onClick={() => room?.send("resetWiresLevel", {})}
+          title="Reset level"
+          className="rounded-none border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-300 transition-colors hover:bg-white/10"
+        >
+          Reset
+        </button>
+      </>
+    )}
+    <button
+      type="button"
+      onClick={openSettings}
+      aria-expanded={settingsOpen}
+      aria-controls="game-settings-panel"
+      aria-label="Open settings"
+      title="Settings"
+      className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-300 transition-colors hover:bg-white/[0.07] hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+    >
+      <Settings className="size-3.5" strokeWidth={1.65} aria-hidden />
+    </button>
+    {onLeave && (
+      <button
+        type="button"
+        onClick={onLeave}
+        aria-label="Leave game"
+        title="Leave game"
+        className="flex size-7 shrink-0 items-center justify-center rounded-none text-slate-500 transition-colors hover:bg-white/[0.07] hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+      >
+        <LogOut className="size-3.5" strokeWidth={1.65} aria-hidden />
+      </button>
+    )}
+  </div>
+</div>
             </div>
           )}
             </>
@@ -1085,12 +1177,12 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                 {challengeName}
               </p>
             ) : null}
-            <p className="font-montreal text-2xl font-bold leading-tight tracking-[0.12em] text-white">
-              Level {stage}
-            </p>
-          </div>
-        </div>
-      </div>
+<p className="font-montreal text-2xl font-bold leading-tight tracking-[0.12em] text-white">
+  Level {stage}
+</p>
+</div>
+</div>
+</div>
 
       {currentLevel === "roles" && <StageLights lights={rolesLevel?.lights ?? 0} />}
 
@@ -1185,31 +1277,32 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
           });
         }}
       >
+{/* <NebulaBackdrop /> Commented out to get rid of background smokey effect KB 7.21 */}
 
-        <OrthographicCamera
-          makeDefault
-          position={get2DCameraPosition(gridWidth, gridHeight)}
-          rotation={[-Math.PI / 2, 0, 0]}
-          zoom={calcBoardZoom(gridWidth, gridHeight, SPACING, window.innerHeight)}
-        />
+<OrthographicCamera
+  makeDefault
+  position={get2DCameraPosition(gridWidth, gridHeight)}
+  rotation={[-Math.PI / 2, 0, 0]}
+  zoom={calcBoardZoom(gridWidth, gridHeight, SPACING, window.innerHeight)}
+/>
 
-        <SmoothZoom
-          gridWidth={gridWidth}
-          gridHeight={gridHeight}
-          spacing={SPACING}
-        />
+<SmoothZoom
+  gridWidth={gridWidth}
+  gridHeight={gridHeight}
+  spacing={SPACING}
+/>
 
-        <ambientLight intensity={0.7} />
-        <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
-        <pointLight position={[-10, -10, -10]} intensity={0.5} color={getFloorTint("GREEN")} />
-        {LEVEL_MESHES[currentLevel] && (
+<ambientLight intensity={0.7} />
+<directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
+<pointLight position={[-10, -10, -10]} intensity={0.5} color={getFloorTint("GREEN")} />
+{LEVEL_MESHES[currentLevel] && (
   <LevelMesh
     key={currentLevel}
     url={LEVEL_MESHES[currentLevel].url}
     position={LEVEL_MESHES[currentLevel].position}
     scale={LEVEL_MESHES[currentLevel].scale}
   />
-)} 
+)}
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
         
            {positionedInteractables.map((item) => (
@@ -1231,7 +1324,9 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
       />
       ))}
 
+            
             {/* Players */}
+            {/* Commented out to remove original Polar Winds player shapes KB 7.21 
             {Array.from(players.values()).map((player, index) => {
               if (currentLevel === "roles") {
                 if (isSoloMode && index !== activePlayerIndex) return null;
@@ -1264,6 +1359,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                 />
               );
             })}
+            */}
 
             {/* Roles level: Monitor-only Operator onion-skin ghost (stage 4) */}
             {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" && (() => {
@@ -1318,6 +1414,57 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
               }
               return null;
             })()}
+
+            {/* Added by KB 7.20.26: Wires level: endpoints + wires */}
+            {currentLevel === "wires" && wiresLevel && (
+              <>
+                <WiresFloor
+                  room={room}
+                  gridWidth={gridWidth}
+                  gridHeight={gridHeight}
+                  spacing={SPACING}
+                  endpoints={wiresLevel.endpoints}
+                />
+                {wiresLevel.endpoints.map((ep) => (
+                  <mesh key={ep.id} position={getVisualPos(ep.x, ep.y, -1.85)}>
+                    <sphereGeometry args={[0.3, 16, 16]} />
+                    <meshStandardMaterial color={
+                      ep.color === "RED" ? "#f87171" :
+                      ep.color === "GREEN" ? "#4ade80" :
+                      ep.color === "BLUE" ? "#38bdf8" :
+                      ep.color === "YELLOW" ? "#fbbf24" :
+                      ep.color === "PURPLE" ? "#c084fc" :
+                      "#ffffff"
+                    } />
+                  </mesh>
+                ))}
+
+              
+                {wiresLevel.completedWires.map((wire, i) => (                  
+                  <Wire
+                    key={i}
+                    points={wire.points.map((p) => ({ x: p.x, y: p.y }))}
+                    color={wire.color}
+                    gridWidth={gridWidth}
+                    gridHeight={gridHeight}
+                    spacing={SPACING}
+                  />
+                ))}
+
+              {wiresLevel.activeDrags
+                .filter((drag) => drag.sessionId !== room?.sessionId)
+                .map((drag) => (
+                  <Wire
+                    key={drag.sessionId}
+                    points={drag.points}
+                    color={drag.color}
+                    gridWidth={gridWidth}
+                    gridHeight={gridHeight}
+                    spacing={SPACING}
+                  />
+                ))}
+              </>
+            )}
 
             {/* Roles level: confirmation tile (Monitor only) */}
             {currentLevel === "roles" && rolesLevel?.confirmationVisible && viewingRole === "MONITOR" && (
@@ -1413,6 +1560,15 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
         </ConveyorLevelProvider>
         )}
 
+      {currentLevel === "wires" && wiresLevel?.solved && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+          <div className="rounded-lg border border-white/20 bg-black/85 px-8 py-4 text-2xl font-bold text-white">
+            Level Solved!
+          </div>
+        </div>
+      )}
+
+    
       {/* Leave confirmation dialog */}
       {showLeaveConfirm && (
         <div

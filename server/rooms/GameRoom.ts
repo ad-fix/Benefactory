@@ -6,6 +6,7 @@ import { RolesLevel } from "../levels/RolesLevel";
 import { Level1 } from "../levels/Level1";
 import { ConveyorLevel } from "../levels/ConveyorLevel";
 import jwt from "jsonwebtoken";
+import { WiresLevel } from "../levels/WiresLevel"; //added by KB 7.20.26
 
 interface MoveMessage {
   direction: "up" | "down" | "left" | "right";
@@ -76,16 +77,22 @@ export class GameRoom extends Room<GameState> {
     this.state.gridWidth = this.INITIAL_VISIBLE_WIDTH;
     this.state.gridHeight = this.INITIAL_VISIBLE_HEIGHT;
 
-    if (options.testLevel === "conveyor") {
+if (options.testLevel === "conveyor") {
   this.state.currentLevel = "conveyor";
   this.currentLevel = new ConveyorLevel(this.state);
-  } else if (options.testLevel === "roles") {
+} else if (options.testLevel === "roles") {
   this.state.currentLevel = "roles";
   this.currentLevel = new RolesLevel(this.state);
-  } else {
+} else if (options.testLevel === "wires") {
+  this.state.gridWidth = 7;
+  this.state.gridHeight = 6;
+  this.state.timeRemaining = 3 * 60; // 3 minutes for wires level
+  this.state.currentLevel = "wires";
+  this.currentLevel = new WiresLevel(this.state, () => this.endGame());
+} else {
   this.state.currentLevel = "level1";
   this.currentLevel = new Level1(this.state);
-  }
+}
 
     console.log("Initial state set");
 
@@ -243,13 +250,45 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
-    // Giving wirecutters for testing bomb wire cutting
-    this.onMessage("devGiveWirecutter", (client, message: { color: string }) => {
-      if (!this.isDevMode) return;
-      const player = this.state.players.get(client.sessionId);
-      if (!player) return;
-      player.heldWirecutter = message.color;
-    });
+// Handle wire drawing (wires level) updated by KB 7.21.26; conflict update by KB 7.27
+this.onMessage("drawWire", (client, message: { color: string; points: { x: number; y: number }[] }) => {
+  if (this.currentLevel instanceof WiresLevel) {
+    const success = this.currentLevel.submitWire(message.points, message.color);
+    console.log(`[WiresLevel] drawWire from ${client.sessionId}: ${success ? "ACCEPTED" : "REJECTED"}`);
+  }
+});
+
+this.onMessage("undoWire", (client) => {
+  if (this.currentLevel instanceof WiresLevel) {
+    this.currentLevel.undoLastWire();
+  }
+});
+
+this.onMessage("resetWiresLevel", (client) => {
+  if (this.currentLevel instanceof WiresLevel) {
+    this.currentLevel.resetLevel();
+  }
+});
+
+this.onMessage("dragProgress", (client, message: { color: string; points: { x: number; y: number }[] }) => {
+  if (this.currentLevel instanceof WiresLevel) {
+    this.currentLevel.updateActiveDrag(client.sessionId, message.color, message.points);
+  }
+});
+
+this.onMessage("dragEnd", (client) => {
+  if (this.currentLevel instanceof WiresLevel) {
+    this.currentLevel.clearActiveDrag(client.sessionId);
+  }
+});
+
+// Giving wirecutters for testing bomb wire cutting
+this.onMessage("devGiveWirecutter", (client, message: { color: string }) => {
+  if (!this.isDevMode) return;
+  const player = this.state.players.get(client.sessionId);
+  if (!player) return;
+  player.heldWirecutter = message.color;
+});
 
     // Handle dev role switcher
     this.onMessage("devSetRole", (client, message: { role: string }) => {
@@ -669,7 +708,7 @@ export class GameRoom extends Room<GameState> {
           clearInterval(this.countdownTimer);
           this.countdownTimer = null;
         }
-        this.state.timeRemaining = this.GAME_DURATION;
+        this.state.timeRemaining = this.state.currentLevel === "wires" ? 3 * 60 : this.GAME_DURATION;
         this.gameStartTime = Date.now();
         this.startGameTimer();
         console.log("Countdown complete — game timer started!");
@@ -747,36 +786,34 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
-  private startGameTimer() {
-    this.gameTimer = setInterval(() => {
-      if (this.isDevMode) {
-        this.state.timeRemaining--;
-      } else if (this.state.timeRemaining > 0) {
-        this.state.timeRemaining--;
-      }
-
-      if (this.state.timeRemaining <= 0 && !this.state.isGameOver && !this.isDevMode) {
-        this.endGame();
-      }
-    }, 1000);
-  }
-
-  private async endGame() {
-    if (this.gameTimer) {
-      clearInterval(this.gameTimer);
-      this.gameTimer = null;
+private startGameTimer() {
+  this.gameTimer = setInterval(() => {
+    if (this.state.timeRemaining > 0) {
+      this.state.timeRemaining--;
     }
 
-    this.state.isGameOver = true;
-    this.state.bombExploded = true;
+    if (this.state.timeRemaining <= 0 && !this.state.isGameOver) {
+      this.endGame();
+    }
+  }, 1000);
+}
 
-    console.log("Game ended!");
-
-    await this.endPolarWindsSession();
-
-    // Dispose the room after game ends
-    this.disconnect();
+private async endGame() {
+  if (this.gameTimer) {
+    clearInterval(this.gameTimer);
+    this.gameTimer = null;
   }
+
+  this.state.isGameOver = true;
+
+  console.log("Game ended!");
+
+  await this.endPolarWindsSession();
+
+  setTimeout(() => {
+    this.disconnect();
+  }, 3000);
+}
 
   private logEvent(event: Record<string, unknown>) {
     event.t = Date.now() - this.gameStartTime;
