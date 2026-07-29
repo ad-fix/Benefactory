@@ -45,6 +45,7 @@ import {
   ROLE_VISUAL,
 } from "@/constants/playerColors";
 import { WiresFloor } from "@/levels/wires/WiresFloor";
+import { ConfirmModal } from "@/components/game/ConfirmModal";
 
 // Types
 type PlayerColor = "RED" | "GREEN" | "BLUE";
@@ -370,6 +371,7 @@ const PolarSlider = ({
   );
 };
 
+
 export const GameScreen = ({
   room,
   players,
@@ -401,6 +403,8 @@ export const GameScreen = ({
   useAmbientMusic(LEVEL_MUSIC[currentLevel] ?? DEFAULT_LEVEL_MUSIC);
   const [activePopup, setActivePopup] = useState<{ imageUrl: string; label: string; triggerId: number } | null>(null);
   const [wireModalOpen, setWireModalOpen] = useState(false);
+  const [generatorModalOpen, setGeneratorModalOpen] = useState(false);
+  const [doorPrompt, setDoorPrompt] = useState<{ targetLevelId: string } | null>(null);
 const popupCounter = useRef(0);
 
 const showPopup = (imageUrl: string, label: string) => {
@@ -420,6 +424,16 @@ const showPopup = (imageUrl: string, label: string) => {
   const settingsCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const SETTINGS_CLOSE_MS = 300;
 
+ const [transitionKey, setTransitionKey] = useState(0);
+const prevLevelRef = useRef(currentLevel);
+
+useEffect(() => {
+  if (prevLevelRef.current !== currentLevel) {
+    console.log(`[Transition] currentLevel changed: ${prevLevelRef.current} -> ${currentLevel}`);
+    prevLevelRef.current = currentLevel;
+    setTransitionKey((k) => k + 1);
+  }
+}, [currentLevel]);
 
   const openSettings = () => {
     if (settingsCloseTimerRef.current != null) {
@@ -495,6 +509,13 @@ const showPopup = (imageUrl: string, label: string) => {
       }
       // If still pending inputs, keep current predicted position (already calculated)
     };
+
+    const offDoorPrompt = room.onMessage("doorPrompt", (message: { targetLevelId: string }) => {
+  setDoorPrompt(message);
+});
+const offDoorPromptClear = room.onMessage("doorPromptClear", () => {
+  setDoorPrompt(null);
+});
 
     const offPing = room.onMessage("ping", handlePing);
     const offMoveAck = room.onMessage("moveAck", handleMoveAck);
@@ -639,6 +660,19 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
         : Array.from(players.values()).find(p => p.color === myColor);
         if (!currentPlayer) return;
 
+         if (currentLevel === "level1") {
+    const MAX_GRID = 26;
+    const center = Math.floor(MAX_GRID / 2);
+    const minX = center - Math.floor(gridWidth / 2);
+    const minY = center - Math.floor(gridHeight / 2);
+    const doorTileX = minX + 5;   // adjacent to the generator's bottom-left blocked corner, right below
+    const doorTileY = minY + 5;
+    if (currentPlayer.x === doorTileX && currentPlayer.y === doorTileY) {
+      setGeneratorModalOpen(true);
+      return;
+    }
+  }
+
         const target = positionedInteractables.find(
         (item) => item.pickup && item.absX === currentPlayer.x && item.absY === currentPlayer.y
         );
@@ -746,7 +780,10 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
 
     const handleCutWire = (color: WireColor) => {
   if (!myPlayer?.heldWirecutter || !room) return;
-  room.send("cutWire", { color });
+  room.send("cutWire", {
+    color,
+    ...(isSoloMode && myPlayer ? { targetColor: myPlayer.color } : {}),
+  });
 };
 
   const lastHintTileRef = useRef<string | null>(null);
@@ -765,6 +802,28 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
   }
   lastHintTileRef.current = tileKey;
 }, [myPlayer, predictedPos, currentLevel, positionedInteractables]);
+
+const lastGeneratorHintRef = useRef<string | null>(null);
+useEffect(() => {
+  if (!myPlayer || currentLevel !== "level1") return;
+  const checkX = predictedPos ? predictedPos.x : myPlayer.x;
+  const checkY = predictedPos ? predictedPos.y : myPlayer.y;
+
+  const MAX_GRID = 26;
+  const center = Math.floor(MAX_GRID / 2);
+  const minX = center - Math.floor(gridWidth / 2);
+  const minY = center - Math.floor(gridHeight / 2);
+  const doorTileX = minX + 5;
+  const doorTileY = minY + 5;
+
+  const onDoorTile = checkX === doorTileX && checkY === doorTileY;
+  const tileKey = onDoorTile ? `${checkX},${checkY}` : null;
+
+  if (tileKey && tileKey !== lastGeneratorHintRef.current) {
+  showPopup("", "Press E to access the generator panel");
+}
+  lastGeneratorHintRef.current = tileKey;
+}, [myPlayer, predictedPos, currentLevel, gridWidth, gridHeight]);
 
   // Role of the player currently controlling/viewing (solo: active player; multiplayer: own role)
   const viewingRole = isSoloMode
@@ -792,6 +851,14 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
     ] as [number, number, number];
   };
 
+  // messages for level transitions
+  const DOOR_PROMPT_MESSAGES: Record<string, string> = {
+  wires: "Turn on the generator?",
+  roles: "Move to the next room?",
+  conveyor: "Move to the next room?",
+  level1: "Move to the next room?",
+};
+
   return (
     <div className="isolate w-full h-screen relative overflow-hidden bg-canvas">
       {/* Cloud nebula backdrop is rendered inside the R3F Canvas (NebulaBackdrop). */}
@@ -810,7 +877,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
            NoiseFieldOverlay + ScoreBurstOverlay moved AFTER the R3F Canvas below. */}
 
       {/* HUD: frosted polar chrome (match timer / stage chips); settings swap into same shell */}
-    <div className="absolute left-4 top-4 z-20 flex w-[min(19rem,calc(100vw-2rem))] flex-col gap-2">
+    <div className="absolute left-4 top-4 z-20 flex w-[min(15rem,calc(100vw-2rem))] flex-col gap-2">
         <div
           className="relative flex flex-col overflow-hidden rounded-none border border-solid bg-canvas/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-inset ring-white/[0.06] backdrop-blur-[4px]"
           style={{ borderColor: POLAR_HUD.border }}
@@ -934,8 +1001,6 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                     Solo mode
                   </p>
                 </div>
-                </div>
-                {/* Commented out in order to adjust the top left info panel KB 7.21
                 <div className="grid min-w-0 gap-1">
                   <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
                     Role
@@ -944,33 +1009,20 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                     className="truncate text-base font-medium tabular-nums leading-tight text-slate-200"
                     style={{
                       color: Array.from(players.values())[activePlayerIndex]
-<{/* Commented out in order to adjust the top left info panel KB 7.21
-<div className="grid min-w-0 gap-1">
-  <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
-    Role
-  </p>
-  <p
-    className="truncate text-base font-medium tabular-nums leading-tight text-slate-200"
-    style={{
-      color: Array.from(players.values())[activePlayerIndex]
-        ? ROLE_VISUAL[Array.from(players.values())[activePlayerIndex].role]?.hex
-        : undefined,
-    }}
-  >
-    {Array.from(players.values())[activePlayerIndex]?.role
-      ? Array.from(players.values())[activePlayerIndex].role.charAt(0) + Array.from(players.values())[activePlayerIndex].role.slice(1).toLowerCase()
-      : "…"}
-  </p>
-</div>
-*/}
+                        ? ROLE_VISUAL[Array.from(players.values())[activePlayerIndex].role]?.hex
+                        : undefined,
+                    }}
+                  >
+                    {Array.from(players.values())[activePlayerIndex]?.role
+                      ? Array.from(players.values())[activePlayerIndex].role.charAt(0) + Array.from(players.values())[activePlayerIndex].role.slice(1).toLowerCase()
+                      : "…"}
+                  </p>
+                </div>
+              </div>
 
               <div className="relative z-10 flex min-h-10 w-full shrink-0 flex-nowrap items-center justify-between gap-x-2 border-t border-white/10 px-3 py-2">
                 <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
-                  <span className="min-w-0 truncate text-[11px] leading-snug text-slate-500">
-                    Click-Drag to Begin
-                  </span>
-                </div>
-                <div className="flex shrink-0 items-center gap-0.5">
+              
                   {currentLevel === "wires" && (
                     <>
                       <button
@@ -1065,16 +1117,16 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
                 </div>
               )}
               <div className="grid min-w-0 gap-1">
-                <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
-                  You
+              <p className="font-montreal text-[16px] uppercase leading-none tracking-[0.12em] text-slate-500">
+                Role
                 </p>
                 <p
-className="truncate text-sm font-medium tabular-nums leading-tight text-slate-200"
-style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
->
-{localPlayerDisplayName ?? (myRole ? myRole.charAt(0) + myRole.slice(1).toLowerCase() : "…")}
-</p>
-</div>
+                className="truncate text-sm font-medium tabular-nums leading-tight text-slate-200"
+                style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
+                >
+                {myRole ? myRole.charAt(0) + myRole.slice(1).toLowerCase() : "…"}
+              </p>
+            </div>
 {/* Removed Role display for wires level KB 7.23
 {myRole && (
   <div className="grid min-w-0 gap-1">
@@ -1090,11 +1142,6 @@ style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
 
 <div className="flex w-full shrink-0 items-center justify-between gap-x-2 border-t border-white/10 pt-2">
   <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
-    <span className="min-w-0 truncate text-[11px] leading-snug text-slate-500">
-      Click-Drag to Begin
-    </span>
-  </div>
-  <div className="flex shrink-0 items-center gap-0.5">
     {currentLevel === "wires" && (
       <>
         <button
@@ -1256,6 +1303,17 @@ style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
         </div>
       )}
 
+      {isDevMode && (
+  <div className="absolute bottom-40 right-8 z-10">
+    <button
+      onClick={() => room?.send("devSolveRoles", {})}
+      className="rounded-none border border-cyan-500/35 bg-cyan-950/50 px-4 py-2 font-montreal text-xs uppercase tracking-wider backdrop-blur-[6px] transition-colors hover:border-cyan-400/50 hover:bg-cyan-950/70"
+    >
+      <p className="text-sm font-bold text-cyan-300">Solve Roles</p>
+    </button>
+  </div>
+)}
+
 
       {/* Main Game Canvas */}
       <CanvasErrorBoundary>
@@ -1301,6 +1359,9 @@ style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
     url={LEVEL_MESHES[currentLevel].url}
     position={LEVEL_MESHES[currentLevel].position}
     scale={LEVEL_MESHES[currentLevel].scale}
+    onClickNode={(nodeName) => {
+      if (nodeName === "generator door") setGeneratorModalOpen(true);
+    }}
   />
 )}
         <ParticleFloor key={`floor-${gridWidth}-${gridHeight}`} gridWidth={gridWidth} gridHeight={gridHeight} spacing={SPACING} rippleTrigger={rippleTrigger} />
@@ -1316,9 +1377,6 @@ style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
           if (item.id === "bomb") {
           setWireModalOpen(true);
           return;
-          }
-          if (!item.pickup) {
-          showPopup(item.imageUrl, item.label);
           } 
        }}
       />
@@ -1326,11 +1384,12 @@ style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
 
             
             {/* Players */}
-            {/* Commented out to remove original Polar Winds player shapes KB 7.21 
             {Array.from(players.values()).map((player, index) => {
+              if (currentLevel === "wires") return null;
               if (currentLevel === "roles") {
                 if (isSoloMode && index !== activePlayerIndex) return null;
                 if (!isSoloMode && player.sessionId !== room?.sessionId) return null;
+                
               }
               const isMe = isSoloMode ? index === activePlayerIndex : player.color === myColor;
               // Use predicted position for local player in multiplayer
@@ -1359,7 +1418,7 @@ style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
                 />
               );
             })}
-            */}
+          
 
             {/* Roles level: Monitor-only Operator onion-skin ghost (stage 4) */}
             {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" && (() => {
@@ -1517,14 +1576,49 @@ style={{ color: myRole ? ROLE_VISUAL[myRole]?.hex : undefined }}
       <StageAnnouncement stage={effectiveStage} />
       <DevStageControls room={room} isDevMode={isDevMode} stage={effectiveStage} onFakeStageChange={setFakeStage} />
       
+    
+      {transitionKey > 0 && (
+  <div key={transitionKey} className="pointer-events-none fixed inset-0 z-[100] bg-black" style={{ animation: "levelFadeIn 2s ease-out forwards" }} />
+)}
+<style>{`
+  @keyframes levelFadeIn {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+`}</style>
+
       {/*inventory*/}
       <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
         <div className="flex size-16 items-center justify-center border border-dashed border-white/20">
           {myPlayer?.heldWirecutter ? (
-            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-4 object-contain" />
+            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-12 object-contain" />
           ) : null}
         </div>
       </div>
+
+      {/* before entering generator for wires puzzle*/}
+      {generatorModalOpen && (
+  <ConfirmModal
+    message="Turn on the generator?"
+    onConfirm={() => {
+      room?.send("enterGenerator", {});
+      setGeneratorModalOpen(false);
+    }}
+    onCancel={() => setGeneratorModalOpen(false)}
+  />
+)}
+
+
+{doorPrompt && (
+  <ConfirmModal
+    message={DOOR_PROMPT_MESSAGES[doorPrompt.targetLevelId] ?? `Move to ${doorPrompt.targetLevelId}?`}
+    onConfirm={() => {
+      room?.send("confirmDoorTransition", {});
+      setDoorPrompt(null);
+    }}
+    onCancel={() => setDoorPrompt(null)}
+  />
+)}
 
       {wireModalOpen && (
         <WireSelectionModal
