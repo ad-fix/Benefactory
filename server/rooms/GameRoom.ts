@@ -7,6 +7,9 @@ import { Level1 } from "../levels/Level1";
 import { ConveyorLevel } from "../levels/ConveyorLevel";
 import jwt from "jsonwebtoken";
 import { WiresLevel } from "../levels/WiresLevel"; //added by KB 7.20.26
+import { LEVEL_GRAPH } from "../levels/LevelGraph";
+import type { DoorZone } from "../levels/LevelGraph";
+
 
 interface MoveMessage {
   direction: "up" | "down" | "left" | "right";
@@ -18,6 +21,13 @@ interface PingMessage {
   x: number;
   y: number;
 }
+
+const LEVEL_DIMENSIONS: Record<string, { width: number; height: number }> = {
+  level1: { width: 10, height: 8 },
+  roles: { width: 10, height: 8 },
+  wires: { width: 7, height: 6 },
+  // conveyor intentionally omitted — it manages its own size across its 3 phases
+};
 
 export class GameRoom extends Room<GameState> {
   maxClients = 10;
@@ -48,6 +58,118 @@ export class GameRoom extends Room<GameState> {
   private sessionEndedInDb: boolean = false;
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
   private currentLevel: BaseLevel | null = null;
+  private levelInstances: Map<string, BaseLevel> = new Map();
+
+private getOrCreateLevel(levelId: string): BaseLevel {
+  if (!this.levelInstances.has(levelId)) {
+    const factories: Record<string, () => BaseLevel> = {
+      level1: () => new Level1(this.state),
+      roles: () => new RolesLevel(this.state),
+      conveyor: () => new ConveyorLevel(this.state),
+      wires: () => new WiresLevel(this.state, () => {
+        this.transitionAllPlayers("level1", [{ x: 4, y: 4 }, { x: 5, y: 4 }, { x: 4, y: 5 }]); // TODO: real Level1 return tiles, near the generator
+      }),
+    };
+    const instance = factories[levelId]();
+    this.levelInstances.set(levelId, instance);
+    instance.onLevelStart();
+  }
+  return this.levelInstances.get(levelId)!;
+}
+
+private readonly DOOR_WAIT_MS = 2000; // how long everyone must stand in the zone before the prompt appears
+private pendingDoor: { key: string; door: DoorZone; readyAt: number; prompted: boolean } | null = null;
+
+// door-crossing check and transition
+private checkForLevelTransition() {
+  if (this.state.currentLevel === "conveyor" && this.currentLevel?.isLevelComplete()) {
+    const door = LEVEL_GRAPH["conveyor"]?.[0];
+    if (door) {
+      const key = "conveyor->roles";
+      const now = Date.now();
+
+      if (!this.pendingDoor || this.pendingDoor.key !== key) {
+        this.pendingDoor = { key, door, readyAt: now + this.DOOR_WAIT_MS, prompted: false };
+        return;
+      }
+
+      if (now < this.pendingDoor.readyAt) return; // still waiting
+
+      if (!this.pendingDoor.prompted) {
+        this.pendingDoor.prompted = true;
+        console.log(`[Door] PROMPTING for ${door.targetLevelId}`);
+        this.broadcast("doorPrompt", { targetLevelId: door.targetLevelId });
+      }
+      return;
+    }
+  }
+  const graph = LEVEL_GRAPH[this.state.currentLevel];
+  if (!graph) return;
+
+  const center = Math.floor(this.MAX_GRID_SIZE / 2);
+  const minX = center - Math.floor(this.state.gridWidth / 2);
+  const minY = center - Math.floor(this.state.gridHeight / 2);
+
+  const allPlayers = Array.from(this.state.players.values());
+  if (allPlayers.length === 0) return;
+
+  let matchedDoorKey: string | null = null;
+  let matchedDoor: DoorZone | null = null;
+
+  for (const door of graph) {
+    const key = `${this.state.currentLevel}->${door.targetLevelId}`;
+    const zoneSet = new Set(door.tiles.map(t => `${t.x},${t.y}`));
+    const everyoneInZone = allPlayers.every(p => zoneSet.has(`${p.x - minX},${p.y - minY}`));
+    if (!everyoneInZone) continue;
+    if (door.requiresCompletion && !this.currentLevel!.isLevelComplete()) continue;
+
+    matchedDoorKey = key;
+    matchedDoor = door;
+    break;
+  }
+
+  if (!matchedDoor || !matchedDoorKey) {
+    this.pendingDoor = null; // no longer standing in any eligible zone
+    return;
+  }
+console.log(`[Door] matched ${matchedDoorKey}, requiresCompletion=${matchedDoor.requiresCompletion}, currentLevelComplete=${this.currentLevel?.isLevelComplete()}`);
+
+  const now = Date.now();
+
+  if (!this.pendingDoor || this.pendingDoor.key !== matchedDoorKey) {
+    this.pendingDoor = { key: matchedDoorKey, door: matchedDoor, readyAt: now + this.DOOR_WAIT_MS, prompted: false };
+    return;
+  }
+
+  if (now < this.pendingDoor.readyAt) return; // still waiting
+
+  if (!this.pendingDoor.prompted) {
+    this.pendingDoor.prompted = true;
+      console.log(`[Door] PROMPTING for ${matchedDoor.targetLevelId}`);
+    this.broadcast("doorPrompt", { targetLevelId: matchedDoor.targetLevelId });
+  }
+}
+
+private transitionAllPlayers(targetLevelId: string, spawnZone: { x: number; y: number }[]) {
+  const dims = LEVEL_DIMENSIONS[targetLevelId];
+  if (dims) {
+    this.state.gridWidth = dims.width;
+    this.state.gridHeight = dims.height;
+  }
+  this.currentLevel = this.getOrCreateLevel(targetLevelId);
+  this.state.currentLevel = targetLevelId;
+  this.state.currentLevelComplete = this.currentLevel.isLevelComplete();
+
+  const center = Math.floor(this.MAX_GRID_SIZE / 2);
+  const minX = center - Math.floor(this.state.gridWidth / 2);
+  const minY = center - Math.floor(this.state.gridHeight / 2);
+
+  Array.from(this.state.players.values()).forEach((player, i) => {
+    const spawn = spawnZone[i % spawnZone.length];
+    player.x = minX + spawn.x;
+    player.y = minY + spawn.y;
+  });
+}
 
   onCreate(options: any) {
     console.log("GameRoom created with options:", options, "| Room ID:", this.roomId);
@@ -68,6 +190,20 @@ export class GameRoom extends Room<GameState> {
       }
     }, this.LOBBY_TIMEOUT);
 
+    this.onMessage("enterGenerator", (client) => {
+  if (this.state.currentLevel !== "level1") return;
+  this.transitionAllPlayers("wires", [{ x: 3, y: 3 }, { x: 3, y: 4 }, { x: 4, y: 3 }]); // TODO: real Wires entry tiles
+});
+
+this.onMessage("confirmDoorTransition", (client) => {
+    console.log(`[Door] confirmDoorTransition received, pendingDoor=${JSON.stringify(this.pendingDoor)}`);
+  if (!this.pendingDoor || !this.pendingDoor.prompted) return;
+  const door = this.pendingDoor.door;
+  this.transitionAllPlayers(door.targetLevelId, door.spawnZone);
+  this.pendingDoor = null;
+  this.broadcast("doorPromptClear", {});
+});
+
     // Initialize LiveKit service
     this.livekitService = new LiveKitService();
 
@@ -77,22 +213,17 @@ export class GameRoom extends Room<GameState> {
     this.state.gridWidth = this.INITIAL_VISIBLE_WIDTH;
     this.state.gridHeight = this.INITIAL_VISIBLE_HEIGHT;
 
-if (options.testLevel === "conveyor") {
-  this.state.currentLevel = "conveyor";
-  this.currentLevel = new ConveyorLevel(this.state);
-} else if (options.testLevel === "roles") {
-  this.state.currentLevel = "roles";
-  this.currentLevel = new RolesLevel(this.state);
-} else if (options.testLevel === "wires") {
+const startLevel = options.testLevel && ["conveyor", "roles", "wires"].includes(options.testLevel)
+  ? options.testLevel
+  : "level1";
+
+if (startLevel === "wires") {
   this.state.gridWidth = 7;
   this.state.gridHeight = 6;
-  this.state.timeRemaining = 3 * 60; // 3 minutes for wires level
-  this.state.currentLevel = "wires";
-  this.currentLevel = new WiresLevel(this.state, () => this.endGame());
-} else {
-  this.state.currentLevel = "level1";
-  this.currentLevel = new Level1(this.state);
 }
+
+this.currentLevel = this.getOrCreateLevel(startLevel);
+this.state.currentLevel = startLevel;
 
     console.log("Initial state set");
 
@@ -157,6 +288,8 @@ if (options.testLevel === "conveyor") {
         this.logEvent({ e: "move", p: this.userIds.get(playerKey) || playerKey, d: direction, x: newX, y: newY });
       }
 
+    this.checkForLevelTransition();   // ← now runs on EVERY move attempt, whether accepted or rejected
+
       // Send acknowledgment with final position (for client-side prediction reconciliation)
       if (message.seq !== undefined) {
         client.send("moveAck", { seq: message.seq, x: player.x, y: player.y });
@@ -181,14 +314,21 @@ if (options.testLevel === "conveyor") {
       player.heldWirecutter = message.wirecutterColor;
     });
 
-      this.onMessage("cutWire", (client, message: { color: string }) => {
-  const player = this.state.players.get(client.sessionId);
+     this.onMessage("cutWire", (client, message: { color: string; targetColor?: "RED" | "GREEN" | "BLUE" }) => {
+  let player: Player | undefined;
+  if (this.isSoloMode && message.targetColor) {
+    this.state.players.forEach((p) => {
+      if (p.color === message.targetColor) player = p;
+    });
+  } else {
+    player = this.state.players.get(client.sessionId);
+  }
   if (!player) return;
-  if (!player.heldWirecutter) return;                 // must be holding a wirecutter
-  if (this.state.bombDefused || this.state.bombExploded) return; // bomb already resolved
+  if (!player.heldWirecutter) return;
+  if (this.state.bombDefused || this.state.bombExploded) return;
 
   const CORRECT_WIRES = ["red", "green", "blue"];
-  player.heldWirecutter = "";                          // consumed on any attempt, right or wrong
+  player.heldWirecutter = "";
 
   if (!CORRECT_WIRES.includes(message.color)) {
     this.state.bombExploded = true;
@@ -204,7 +344,7 @@ if (options.testLevel === "conveyor") {
     this.state.bombDefused = true;
     this.state.isGameOver = true;
   }
-  });
+});
 
     // Handle ping - just broadcast to all clients, don't store in state
     this.onMessage("ping", (client, message: PingMessage) => {
@@ -249,6 +389,12 @@ if (options.testLevel === "conveyor") {
         this.currentLevel.devSetStage(stage);
       }
     });
+    // Solving Roles stage
+    this.onMessage("devSolveRoles", (client) => {
+  if (!this.isDevMode) return;
+  if (this.state.currentLevel !== "roles") return;
+  this.state.rolesLevel.lights = 4;
+});
 
 // Handle wire drawing (wires level) updated by KB 7.21.26; conflict update by KB 7.27
 this.onMessage("drawWire", (client, message: { color: string; points: { x: number; y: number }[] }) => {
@@ -681,7 +827,6 @@ this.onMessage("devGiveWirecutter", (client, message: { color: string }) => {
     await this.setPrivate(true);
 
     this.state.gameStarted = true;
-    if (this.currentLevel) this.currentLevel.onLevelStart();
 
     console.log(`Game mode: ${this.isSoloMode ? 'SOLO' : 'MULTIPLAYER'}`);
 
@@ -708,7 +853,7 @@ this.onMessage("devGiveWirecutter", (client, message: { color: string }) => {
           clearInterval(this.countdownTimer);
           this.countdownTimer = null;
         }
-        this.state.timeRemaining = this.state.currentLevel === "wires" ? 3 * 60 : this.GAME_DURATION;
+        this.state.timeRemaining = this.GAME_DURATION;
         this.gameStartTime = Date.now();
         this.startGameTimer();
         console.log("Countdown complete — game timer started!");

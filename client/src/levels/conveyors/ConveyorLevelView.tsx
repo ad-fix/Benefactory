@@ -248,13 +248,6 @@ const beltStyle = (belt: ConveyorLocal): CSSProperties => {
     <div className="pointer-events-none absolute inset-0 z-[30] font-sans text-[#ebe5cf]">
       <div 
           className="absolute inset-0">      
-        <div
-          className="absolute inset-0 opacity-1"
-          style={{
-            backgroundImage: "linear-gradient(rgba(235,229,207,.1) 1px,transparent 1px),linear-gradient(90deg,rgba(235,229,207,.1) 1px,transparent 1px)",
-            backgroundSize: `${100 / gridWidth}% ${100 / gridHeight}%`,
-          }}
-        />
         {conveyorLevel.conveyors.map((belt) => {
           const theme = ROLE_THEME[belt.owner] ?? ROLE_THEME.OPERATOR;
           const horizontal = belt.startY === belt.endY;
