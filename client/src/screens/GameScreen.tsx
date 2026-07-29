@@ -581,6 +581,16 @@ const offDoorPromptClear = room.onMessage("doorPromptClear", () => {
       }
     }
   }, [activePlayerIndex, isSoloMode, players]);
+  // Reset prediction when the level itself changes (e.g. walking through a door),
+// so the player token doesn't briefly render in the old level's coordinate space.
+const prevCurrentLevelRef = useRef(currentLevel);
+useEffect(() => {
+  if (prevCurrentLevelRef.current !== currentLevel) {
+    prevCurrentLevelRef.current = currentLevel;
+    pendingInputsRef.current.clear();
+    setPredictedPos(null);
+  }
+}, [currentLevel]);
 
     const CONVEYOR_SPAWN_TILES: [number, number][] = [
      [12, 25], // TODO: replace with real coordinates
