@@ -38,7 +38,7 @@ interface InteractableItemProps {
         onPointerOut={() => setHovered(false)}
       >
         <planeGeometry args={[size, size]} />
-        <meshBasicMaterial map={texture} transparent />
+        <meshBasicMaterial map={texture} transparent depthWrite={false} />
       </mesh>
     </group>
   );

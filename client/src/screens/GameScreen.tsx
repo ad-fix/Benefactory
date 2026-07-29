@@ -371,6 +371,7 @@ const PolarSlider = ({
   );
 };
 
+
 export const GameScreen = ({
   room,
   players,
@@ -428,6 +429,7 @@ const prevLevelRef = useRef(currentLevel);
 
 useEffect(() => {
   if (prevLevelRef.current !== currentLevel) {
+    console.log(`[Transition] currentLevel changed: ${prevLevelRef.current} -> ${currentLevel}`);
     prevLevelRef.current = currentLevel;
     setTransitionKey((k) => k + 1);
   }
@@ -663,7 +665,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
     const center = Math.floor(MAX_GRID / 2);
     const minX = center - Math.floor(gridWidth / 2);
     const minY = center - Math.floor(gridHeight / 2);
-    const doorTileX = minX + 4;   // adjacent to the generator's bottom-left blocked corner, right below
+    const doorTileX = minX + 5;   // adjacent to the generator's bottom-left blocked corner, right below
     const doorTileY = minY + 5;
     if (currentPlayer.x === doorTileX && currentPlayer.y === doorTileY) {
       setGeneratorModalOpen(true);
@@ -801,6 +803,28 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
   lastHintTileRef.current = tileKey;
 }, [myPlayer, predictedPos, currentLevel, positionedInteractables]);
 
+const lastGeneratorHintRef = useRef<string | null>(null);
+useEffect(() => {
+  if (!myPlayer || currentLevel !== "level1") return;
+  const checkX = predictedPos ? predictedPos.x : myPlayer.x;
+  const checkY = predictedPos ? predictedPos.y : myPlayer.y;
+
+  const MAX_GRID = 26;
+  const center = Math.floor(MAX_GRID / 2);
+  const minX = center - Math.floor(gridWidth / 2);
+  const minY = center - Math.floor(gridHeight / 2);
+  const doorTileX = minX + 5;
+  const doorTileY = minY + 5;
+
+  const onDoorTile = checkX === doorTileX && checkY === doorTileY;
+  const tileKey = onDoorTile ? `${checkX},${checkY}` : null;
+
+  if (tileKey && tileKey !== lastGeneratorHintRef.current) {
+  showPopup("", "Press E to access the generator panel");
+}
+  lastGeneratorHintRef.current = tileKey;
+}, [myPlayer, predictedPos, currentLevel, gridWidth, gridHeight]);
+
   // Role of the player currently controlling/viewing (solo: active player; multiplayer: own role)
   const viewingRole = isSoloMode
     ? (Array.from(players.values())[activePlayerIndex]?.role ?? null)
@@ -826,6 +850,14 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
       (y - offsetY) * SPACING
     ] as [number, number, number];
   };
+
+  // messages for level transitions
+  const DOOR_PROMPT_MESSAGES: Record<string, string> = {
+  wires: "Turn on the generator?",
+  roles: "Move to the next room?",
+  conveyor: "Move to the next room?",
+  level1: "Move to the next room?",
+};
 
   return (
     <div className="isolate w-full h-screen relative overflow-hidden bg-canvas">
@@ -1559,7 +1591,7 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
       <div className="fixed bottom-4 left-4 z-20 flex flex-col items-center gap-1 rounded-none border border-solid bg-canvas/50 p-2 backdrop-blur-[4px]" style={{ borderColor: POLAR_HUD.border }}>
         <div className="flex size-16 items-center justify-center border border-dashed border-white/20">
           {myPlayer?.heldWirecutter ? (
-            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-4 object-contain" />
+            <img src={`/images/wirecutters-${myPlayer.heldWirecutter}.png`} alt={`${myPlayer.heldWirecutter} wirecutter`} className="size-12 object-contain" />
           ) : null}
         </div>
       </div>
@@ -1576,9 +1608,10 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
   />
 )}
 
+
 {doorPrompt && (
   <ConfirmModal
-    message={`Move to ${doorPrompt.targetLevelId}?`}
+    message={DOOR_PROMPT_MESSAGES[doorPrompt.targetLevelId] ?? `Move to ${doorPrompt.targetLevelId}?`}
     onConfirm={() => {
       room?.send("confirmDoorTransition", {});
       setDoorPrompt(null);
