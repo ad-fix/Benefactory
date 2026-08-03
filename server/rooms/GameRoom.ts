@@ -216,6 +216,11 @@ private transitionAllPlayers(targetLevelId: string, spawnZone: { x: number; y: n
 
 this.onMessage("introComplete", (client) => {
   this.introReadySessionIds.add(client.sessionId);
+  if (this.gameTimerStarted) {
+    // Timer already started before this client's signal arrived — catch them up directly.
+    client.send("gameTimerStarted", {});
+    return;
+  }
   this.checkAllIntrosComplete();
 });
 
