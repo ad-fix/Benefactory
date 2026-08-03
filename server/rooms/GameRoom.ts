@@ -81,7 +81,7 @@ private introReadySessionIds = new Set<string>();
 private gameTimerStarted = false;
 
 private checkAllIntrosComplete() {
-  const requiredCount = this.clients.filter(c => !this.spectatorSessionIds.has(c.sessionId)).length;
+  const requiredCount = this.state.players.size; // use the actual full player roster, not live client count
   this.broadcast("introProgress", { ready: this.introReadySessionIds.size, total: requiredCount });
   if (requiredCount > 0 && this.introReadySessionIds.size >= requiredCount && !this.gameTimerStarted) {
     this.startGameTimerDirectly();
