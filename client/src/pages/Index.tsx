@@ -218,7 +218,7 @@ function gameReducer(_state: GameStateLocal, action: GameAction): GameStateLocal
   }
 }
 
-type Phase = "connecting" | "game";
+type Phase = "connecting" | "intro" | "game";
 
 const Index = () => {
   const location = useLocation();
@@ -264,6 +264,8 @@ const Index = () => {
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
   const [bgMusicVolume, setBgMusicVolume] = useState(0.3);
   const { play: playSound } = useSounds();
+  const [introProgress, setIntroProgress] = useState<{ ready: number; total: number } | null>(null);
+  const [waitingForOthers, setWaitingForOthers] = useState(false);
 
   // LiveKit voice chat
   const [voiceToken, setVoiceToken] = useState<string | null>(null);
@@ -287,26 +289,6 @@ const Index = () => {
     room?.leave();
     setShowResults(true);
   }, [gameState.isGameOver]);
-
-  // Show "GO" briefly when countdown transitions from >0 to 0,
-  // and play the movement SFX on each tick from 10 down through GO (0).
-  useEffect(() => {
-    const prev = prevCountdownRef.current;
-    const current = gameState.countdown;
-    prevCountdownRef.current = current;
-
-    if (current > 0) countdownMaxRef.current = Math.max(countdownMaxRef.current, current);
-
-
-    if (prev > 0 && current === 0) {
-      setShowGo(true);
-      const timer = setTimeout(() => {
-        setShowGo(false);
-        countdownMaxRef.current = 0;
-      }, 600);
-      return () => clearTimeout(timer);
-    }
-  }, [gameState.countdown, playSound]);
 
   const createStateUpdater = useCallback((gameRoom: Client.Room<ServerGameState>) => () => {
     if (!gameRoom.state) return;
@@ -452,6 +434,13 @@ const Index = () => {
           }
         }
       });
+gameRoom.onMessage("introProgress", (message: { ready: number; total: number }) => {
+  setIntroProgress(message);
+});
+
+gameRoom.onMessage("gameTimerStarted", () => {
+  setPhase("game");
+});
 
       gameRoom.onMessage("voiceReady", (message: { token: string; livekitUrl: string; roomName: string; playerColors?: Record<string, string> }) => {
         setVoiceToken(message.token);
@@ -463,6 +452,7 @@ const Index = () => {
 
       return runSync;
     }
+    
 
     async function attemptReconnect() {
       if (aborted) return;
@@ -576,7 +566,7 @@ const Index = () => {
         gameRoom.onStateChange(() => {
           if (!initialised) {
             initialised = true;
-            setPhase("game");
+            setPhase("intro");
           }
         });
       } catch (e) {
@@ -596,7 +586,7 @@ const Index = () => {
   // Transition from connecting to game when gameStarted
   useEffect(() => {
     if (gameState.gameStarted && phase === "connecting" && room) {
-      setPhase("game");
+      setPhase("intro");
     }
   }, [gameState.gameStarted, phase, room]);
 
@@ -675,6 +665,46 @@ const Index = () => {
       </div>
     );
   }
+
+ if (phase === "intro") {
+  const finishIntro = () => {
+    room?.send("introComplete", {});
+    setWaitingForOthers(true);
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black">
+      <video
+        src="/videos/Intro.mp4"
+        autoPlay
+        playsInline
+        onEnded={finishIntro}
+        className="h-full w-full object-contain"
+      />
+      <audio src="/music/Afterglow.mp3" autoPlay />
+      <button
+        type="button"
+        onClick={finishIntro}
+        className="absolute bottom-6 right-6 z-10 rounded-none border border-white/30 bg-black/60 px-4 py-2 font-montreal text-xs uppercase tracking-wider text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+      >
+        Skip Intro
+      </button>
+      {waitingForOthers && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/85">
+          <div className="flex flex-col items-center gap-3">
+            <div
+              className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
+              style={{ borderColor: "rgba(0, 149, 255, 0.3)", borderTopColor: "transparent" }}
+              aria-hidden
+            />
+            <p className="font-montreal text-xs uppercase tracking-wider text-sky-200/90">
+              Waiting for other players... {introProgress ? `${introProgress.ready}/${introProgress.total}` : ""}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
   if (phase === "connecting") {
     return (

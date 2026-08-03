@@ -581,6 +581,16 @@ const offDoorPromptClear = room.onMessage("doorPromptClear", () => {
       }
     }
   }, [activePlayerIndex, isSoloMode, players]);
+  // Reset prediction when the level itself changes (e.g. walking through a door),
+// so the player token doesn't briefly render in the old level's coordinate space.
+const prevCurrentLevelRef = useRef(currentLevel);
+useEffect(() => {
+  if (prevCurrentLevelRef.current !== currentLevel) {
+    prevCurrentLevelRef.current = currentLevel;
+    pendingInputsRef.current.clear();
+    setPredictedPos(null);
+  }
+}, [currentLevel]);
 
     const CONVEYOR_SPAWN_TILES: [number, number][] = [
      [12, 25], // TODO: replace with real coordinates
@@ -661,17 +671,21 @@ const worldToScreenPercent = (worldX: number, worldZ: number) => {
         if (!currentPlayer) return;
 
          if (currentLevel === "level1") {
-    const MAX_GRID = 26;
-    const center = Math.floor(MAX_GRID / 2);
-    const minX = center - Math.floor(gridWidth / 2);
-    const minY = center - Math.floor(gridHeight / 2);
-    const doorTileX = minX + 5;   // adjacent to the generator's bottom-left blocked corner, right below
-    const doorTileY = minY + 5;
-    if (currentPlayer.x === doorTileX && currentPlayer.y === doorTileY) {
+  const MAX_GRID = 26;
+  const center = Math.floor(MAX_GRID / 2);
+  const minX = center - Math.floor(gridWidth / 2);
+  const minY = center - Math.floor(gridHeight / 2);
+  const doorTileX = minX + 5;
+  const doorTileY = minY + 5;
+  if (currentPlayer.x === doorTileX && currentPlayer.y === doorTileY) {
+    if (wiresLevel?.solved) {
+      showPopup("", "The power has already been turned on!");
+    } else {
       setGeneratorModalOpen(true);
-      return;
     }
+    return;
   }
+}
 
         const target = positionedInteractables.find(
         (item) => item.pickup && item.absX === currentPlayer.x && item.absY === currentPlayer.y
@@ -820,7 +834,7 @@ useEffect(() => {
   const tileKey = onDoorTile ? `${checkX},${checkY}` : null;
 
   if (tileKey && tileKey !== lastGeneratorHintRef.current) {
-  showPopup("", "Press E to access the generator panel");
+  showPopup("", wiresLevel?.solved ? "The power has already been turned on!" : "Press E to turn on the generator");
 }
   lastGeneratorHintRef.current = tileKey;
 }, [myPlayer, predictedPos, currentLevel, gridWidth, gridHeight]);
@@ -1361,6 +1375,11 @@ useEffect(() => {
     scale={LEVEL_MESHES[currentLevel].scale}
     onClickNode={(nodeName) => {
       if (nodeName === "generator door") setGeneratorModalOpen(true);
+      if (wiresLevel?.solved) {
+    showPopup("", "The power has already been turned on!");
+  } else {
+    setGeneratorModalOpen(true);
+  }
     }}
   />
 )}

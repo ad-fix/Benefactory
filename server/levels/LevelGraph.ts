@@ -10,7 +10,7 @@ export const LEVEL_GRAPH: Record<string, DoorZone[]> = {
     {
       tiles: [{ x: 4, y: 0 }, { x: 5, y: 0 }],       // the real two doorway tiles
       targetLevelId: "roles",
-      spawnZone: [{ x: 4, y: 1 }, { x: 5, y: 1 }],   // one row inside Roles, away from its own doors
+      spawnZone: [{ x: 4, y: 7 }, { x: 5, y: 6 }],   // one row inside Roles, away from its own doors
       requiresCompletion: true,
     },
   ],
@@ -31,7 +31,7 @@ export const LEVEL_GRAPH: Record<string, DoorZone[]> = {
     {
       tiles: [{ x: 0, y: 0 }, { x: 1, y: 0 }],       // the real two doorway tiles back to Roles
       targetLevelId: "roles",
-      spawnZone: [{ x: 4, y: 4 }, { x: 5, y: 4 }],   // TODO: real return spot in Roles, away from BOTH of its doors
+      spawnZone: [{ x: 4, y: 1 }, { x: 5, y: 1 }],   // TODO: real return spot in Roles, away from BOTH of its doors
       requiresCompletion: true,
     },
   ],
