@@ -1434,7 +1434,7 @@ useEffect(() => {
             })()}
 
             {/* Roles level: Monitor-only ghost buttons + relocation countdown (stage 4) */}
-            {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" &&
+            {currentLevel === "roles" && rolesLevel?.stage === 4 && viewingRole === "MONITOR" && !currentLevelComplete &&
               rolesLevel.operatorButtons.map(btn => (
                 <GhostButton
                   key={btn.id}
