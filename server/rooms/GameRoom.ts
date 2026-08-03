@@ -77,6 +77,25 @@ private getOrCreateLevel(levelId: string): BaseLevel {
   return this.levelInstances.get(levelId)!;
 }
 
+private introReadySessionIds = new Set<string>();
+private gameTimerStarted = false;
+
+private checkAllIntrosComplete() {
+  const requiredCount = this.clients.filter(c => !this.spectatorSessionIds.has(c.sessionId)).length;
+  this.broadcast("introProgress", { ready: this.introReadySessionIds.size, total: requiredCount });
+  if (requiredCount > 0 && this.introReadySessionIds.size >= requiredCount && !this.gameTimerStarted) {
+    this.startGameTimerDirectly();
+  }
+}
+
+private startGameTimerDirectly() {
+  this.gameTimerStarted = true;
+  this.state.timeRemaining = this.GAME_DURATION;
+  this.gameStartTime = Date.now();
+  this.startGameTimer();
+  this.broadcast("gameTimerStarted", {});
+}
+
 private readonly DOOR_WAIT_MS = 2000; // how long everyone must stand in the zone before the prompt appears
 private pendingDoor: { key: string; door: DoorZone; readyAt: number; prompted: boolean } | null = null;
 
@@ -195,6 +214,11 @@ private transitionAllPlayers(targetLevelId: string, spawnZone: { x: number; y: n
   this.transitionAllPlayers("wires", [{ x: 3, y: 3 }, { x: 3, y: 4 }, { x: 4, y: 3 }]); // TODO: real Wires entry tiles
 });
 
+this.onMessage("introComplete", (client) => {
+  this.introReadySessionIds.add(client.sessionId);
+  this.checkAllIntrosComplete();
+});
+
 this.onMessage("confirmDoorTransition", (client) => {
     console.log(`[Door] confirmDoorTransition received, pendingDoor=${JSON.stringify(this.pendingDoor)}`);
   if (!this.pendingDoor || !this.pendingDoor.prompted) return;
@@ -229,7 +253,7 @@ this.state.currentLevel = startLevel;
 
     // Handle player movement
     this.onMessage("move", (client, message: MoveMessage) => {
-      if (this.state.countdown > 0) return;
+      if (!this.gameTimerStarted) return;
 
       // In solo mode with targetColor, move the specified color's player
       let player: Player | undefined;
@@ -834,9 +858,6 @@ this.onMessage("devGiveWirecutter", (client, message: { color: string }) => {
     if (!this.isSoloMode) {
       await this.initializeVoiceChat();
     }
-
-    // Start countdown immediately — no ready-up handshake needed
-    this.startGameplay();
   }
 
   private startGameplay() {
